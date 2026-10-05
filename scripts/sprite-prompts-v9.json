@@ -1,0 +1,30 @@
+{
+  "tool": "image_gen__imagegen",
+  "mode": "built-in reference image editing",
+  "generated_date": "2026-09-22",
+  "assets": [
+    {
+      "filename": "zero-motion-v9.png",
+      "prompt": "Use case: style-transfer. Edit referenced sprite sheet into crisp pixel game art sheet on uniform solid pure magenta #FF00FF background. Exactly 4 columns and 4 rows, 16 isolated full body sprites in equal cells, generous gutters, no words or grid lines. IMPORTANT redesign proportions: Zero is a compact cute mascot only 3 to 3.5 heads tall, MUCH shorter arms and legs than reference, large head and oversized gold goggles and big gold gloves. Preserve black zip suit silver piping and large square zipper, silver headband and ear caps, red gems knees and ankles and silver boots. Faces RIGHT in every cell. Large black wedge hair spikes MUST point FORWARD RIGHT over forehead like Joe Yabuki, NOT backward; reference drawing shows forward spikes. No weapons or effects or wings baked into hands/body. Each sprite inside central 70% of its cell. Rows top to bottom: row0 four subtly breathing ready fists poses. row1 normal untransformed arm shooting sequence base, raise, extend original gold palm, recoil. row2 sword transformation preparation sequence base, brace, raise arms, slash followthrough WITH EMPTY HANDS. row3 wing preparation base brace, crouch, open arms, hover feet tucked. Reference 1 edit target; reference 2 original costume design.",
+      "referenced_image_paths": [
+        "/workspace/scratch/769286318d85/art-assets/v8/zero-motion-v8.png",
+        "/workspace/scratch/769286318d85/upload/イラスト 20260919.jpg"
+      ]
+    },
+    {
+      "filename": "zero-loops-v9.png",
+      "prompt": "Use case: style-transfer. Edit referenced sprite sheet into crisp pixel game art sheet on uniform solid pure magenta #FF00FF background. Exactly 4 columns and 4 rows, 16 isolated full body sprites in equal cells, generous gutters, no words or grid lines. IMPORTANT redesign proportions: Zero is a compact cute mascot only 3 to 3.5 heads tall, MUCH shorter arms and legs than reference, large head and oversized gold goggles and big gold gloves. Preserve black zip suit silver piping and large square zipper, silver headband and ear caps, red gems knees and ankles and silver boots. Faces RIGHT in every cell. Large black wedge hair spikes MUST point FORWARD RIGHT over forehead like Joe Yabuki, NOT backward; reference drawing shows forward spikes. No weapons or effects or wings baked into hands/body. Each sprite inside central 70% of its cell. Rows top to bottom: row0 four gold bare mechanical hand shooting variations, palm extended right. row1 four sword-ready pose variations with EMPTY HANDS, no sword. row2 four hovering poses feet tucked arms out. row3 four frightened flailing trapped poses. Reference 1 edit target; reference 2 original costume design.",
+      "referenced_image_paths": [
+        "/workspace/scratch/769286318d85/art-assets/v8/zero-loops-v8.png",
+        "/workspace/scratch/769286318d85/upload/イラスト 20260919.jpg"
+      ]
+    },
+    {
+      "filename": "bugs-extra-v9.png",
+      "prompt": "Use case: style-transfer. Use reference mechanical insects only for crisp pixel game art style. Create new sprite sheet of THREE DISTINCT NEW mechanical insect types facing LEFT. Exactly 4 columns x3 rows, 12 sprites in equal cells on uniform solid pure magenta #FF00FF background. No gradients, words, grid, effects or overlapping frame boundaries. Keep all sprite parts inside middle 70% of cell with generous gutters. Row0 green mechanical praying mantis 4 poses idle, scythe raise, slash, idle. Row1 bronze mechanical rhinoceros beetle poses idle, horn raise, charge, idle. Row2 purple and cyan mechanical moth four wingbeat poses up, flat, down, up. Visible robotic joints, segmented metal shells, vivid compound eyes, distinct recognizable silhouettes; side view heads face LEFT. Equal cell grid and scale.",
+      "referenced_image_paths": [
+        "/workspace/scratch/769286318d85/art-assets/v5/bugs-motion.png"
+      ]
+    }
+  ]
+}

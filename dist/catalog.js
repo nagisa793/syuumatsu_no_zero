@@ -1,0 +1,3 @@
+'use strict';
+// Reference only: selecting and activating techniques remains a voice command.
+$('filecatalog').innerHTML=Object.entries(files).map(([key,list])=>`<details class="file-family"><summary>File: ${fileMeta[key].jp} <span>${fileMeta[key].label} / ${String(list.length).padStart(3,'0')}</span></summary><div class="catalog-scroll"><table><caption>File: ${fileMeta[key].jp} の性能とバッテリー消費</caption><thead><tr><th scope="col">No.</th><th scope="col">技・効果</th><th scope="col">消費</th></tr></thead><tbody>${list.map(c=>`<tr><td>${String(c.num).padStart(3,'0')}</td><td><b>${c.name}</b><span>${c.desc}</span></td><td><strong>${c.cost}%</strong><small>${key==='wing'?'発動時':'1回'}</small></td></tr>`).join('')}</tbody></table></div></details>`).join('');
