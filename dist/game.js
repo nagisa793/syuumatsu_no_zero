@@ -82,7 +82,7 @@ function unlockAudio(fromGesture=false){
   if(audio.state==='running')for(const track of audioScoreTracks())if(!track.paused&&!track.source)track.startSource();
  }catch{}
 }
-function audioScoreTracks(){return [typeof battleMusic==='undefined'?null:battleMusic,typeof homeMusic==='undefined'?null:homeMusic].filter(Boolean)}
+function audioScoreTracks(){return [typeof battleMusic==='undefined'?null:battleMusic,typeof homeMusic==='undefined'?null:homeMusic,typeof prologueScore==='undefined'?null:prologueScore,typeof prologueEffects==='undefined'?null:prologueEffects].filter(Boolean)}
 function recoverGameAudio(event){
  // A finger/pen touching down is not an activation event. Resume during
  // touch completion/click as well, while mobile Safari permits output.
@@ -177,6 +177,7 @@ function resumeBattle(){
  if(typeof syncBattleMusic==='function')syncBattleMusic();
  updateHud();menuFocusReturn?.focus?.();menuFocusReturn=null;
  if(typeof resumeHomeIntroVoice==='function')resumeHomeIntroVoice();
+ if(typeof resumePrologueVoice==='function')resumePrologueVoice();
  if(state==='start'&&typeof startWhenReady==='function')startWhenReady();
 }
 function pause(){

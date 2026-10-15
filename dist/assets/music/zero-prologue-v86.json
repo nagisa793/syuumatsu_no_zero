@@ -1,0 +1,20 @@
+{
+  "duration": 12.8,
+  "music": "dark electronic disaster to decisive Em9 slash",
+  "stems": [
+    "score",
+    "effects"
+  ],
+  "voice": "existing Akari long-sword cue",
+  "cues": {
+    "star": 0,
+    "crumble": 1.15,
+    "city": 2.8,
+    "akari": 7.2,
+    "command": 8.4,
+    "sword": 10.1,
+    "hit": 10.6,
+    "white": 12,
+    "home": 12.8
+  }
+}

@@ -26,7 +26,7 @@ const MUSIC_MIX=.176; // 40% of the previous BGM gain; SFX remain unchanged.
 class BattleScore {
  constructor(url='assets/music/zero-debug-battle-v17.mp3'){
   this.url=url;
-  this.paused=true;this.plays=0;this.source=null;this.gain=null;this.buffer=null;this.offset=0;this.startedAt=0;this.generation=0;this._volume=musicVolume*MUSIC_MIX;this._muted=false;this.decoding=null;
+  this.paused=true;this.loop=true;this.plays=0;this.source=null;this.gain=null;this.buffer=null;this.offset=0;this.startedAt=0;this.generation=0;this._volume=musicVolume*MUSIC_MIX;this._muted=false;this.decoding=null;
   this.bytes=this.loadBytes();
  }
  loadBytes(){return fetch(this.url).then(r=>{if(!r.ok)throw new Error('BGM download');return r.arrayBuffer()}).catch(()=>null)}
@@ -35,10 +35,10 @@ class BattleScore {
  get muted(){return this._muted}
  set muted(value){this._muted=!!value;this.applyGain()}
  applyGain(){if(this.gain)this.gain.gain.value=this._muted?0:this._volume}
- get currentTime(){return this.source?((this.offset+audio.currentTime-this.startedAt)%this.buffer.duration):this.offset}
+ get currentTime(){if(!this.source)return this.offset;const value=this.offset+audio.currentTime-this.startedAt;return this.loop?value%this.buffer.duration:Math.min(value,this.buffer.duration)}
  set currentTime(value){this.offset=Math.max(0,value);if(this.source){this.stopSource();this.startSource()}}
  stopSource(){const old=this.source;this.source=null;if(old){try{old.stop()}catch{}old.disconnect()}}
- startSource(){if(this.paused||!this.buffer||!audio)return;this.stopSource();this.gain??=audio.createGain();this.gain.disconnect();this.gain.connect(audio.destination);this.applyGain();const source=audio.createBufferSource();source.buffer=this.buffer;source.loop=true;source.connect(this.gain);this.source=source;this.startedAt=audio.currentTime;source.start(0,this.offset%this.buffer.duration)}
+ startSource(){if(this.paused||!this.buffer||!audio)return;this.stopSource();this.gain??=audio.createGain();this.gain.disconnect();this.gain.connect(audio.destination);this.applyGain();const source=audio.createBufferSource();source.buffer=this.buffer;source.loop=this.loop;source.connect(this.gain);this.source=source;this.startedAt=audio.currentTime;source.start(0,this.loop?this.offset%this.buffer.duration:Math.min(this.offset,this.buffer.duration))}
  async ready(){
   if(this.buffer)return;unlockAudio();if(!audio)throw new Error('Web Audio unavailable');
   if(!this.decoding)this.decoding=this.bytes.then(bytes=>{if(!bytes){this.bytes=this.loadBytes();throw new Error('BGM download')}return audio.decodeAudioData(bytes.slice(0))}).then(buffer=>{this.buffer=buffer}).catch(error=>{this.decoding=null;throw error});
@@ -62,7 +62,7 @@ function attemptHomeAutoplay(){
 }
 function stopHomeMusic(){homeMusicRequest++;homeMusicPending=false;if(homeMusic&&!homeMusic.paused)homeMusic.pause()}
 function syncHomeMusic(){
- const track=ensureHomeMusic(),active=state==='start'&&sound&&music&&!document.hidden;
+ const track=ensureHomeMusic(),active=state==='start'&&sound&&music&&!document.hidden&&!(typeof openingBlocksHome==='function'&&openingBlocksHome());
  track.volume=musicVolume*MUSIC_MIX;
  if(!active){stopHomeMusic();return}
  if(audio?.state==='running'&&(homeAudioWarmContext!==audio||Date.now()>=homeAudioWarmAt)){
@@ -82,6 +82,6 @@ function playBattleMusic(){const track=ensureBattleMusic();if(musicPlayPending||
 function restartBattleMusic(){const track=ensureBattleMusic();musicRequest++;musicPlayPending=false;musicFailed=false;musicFailures=0;musicPrimed=false;musicPlaying=false;track.pause();track.currentTime=0;track.volume=musicVolume*MUSIC_MIX}
 function primeBattleScore(){const track=ensureBattleMusic();track.muted=true;musicPrimed=true;if(sound&&music)playBattleMusic()}
 function startBattleScore(){unlockAudio();const track=ensureBattleMusic();scoreStarted=true;musicPrimed=false;track.currentTime=0;track.muted=false;track.volume=musicVolume*MUSIC_MIX;if(sound&&music)playBattleMusic()}
-function syncBattleMusic(){syncHomeMusic();const track=battleMusic;if(!track)return;const volume=musicVolume*MUSIC_MIX;if(track.volume!==volume)track.volume=volume;const active=sound&&music&&(['battle','target','lock'].includes(state)||state==='intro'&&(scoreStarted||musicPrimed));if(!active){if(musicPlaying||!track.paused){track.pause();musicRequest++;musicPlayPending=false;musicPlaying=false}return}if(audio?.state!=='running')unlockAudio();if(musicFailed&&musicFailures<3&&Date.now()>=musicRetryAt)musicFailed=false;if(musicPlaying&&!musicPlayPending&&track.paused)musicPlaying=false;if(!musicPlaying&&!musicPlayPending&&!musicFailed)playBattleMusic()}
+function syncBattleMusic(){syncHomeMusic();if(typeof syncPrologueAudio==='function')syncPrologueAudio();const track=battleMusic;if(!track)return;const volume=musicVolume*MUSIC_MIX;if(track.volume!==volume)track.volume=volume;const active=sound&&music&&(['battle','target','lock'].includes(state)||state==='intro'&&(scoreStarted||musicPrimed));if(!active){if(musicPlaying||!track.paused){track.pause();musicRequest++;musicPlayPending=false;musicPlaying=false}return}if(audio?.state!=='running')unlockAudio();if(musicFailed&&musicFailures<3&&Date.now()>=musicRetryAt)musicFailed=false;if(musicPlaying&&!musicPlayPending&&track.paused)musicPlaying=false;if(!musicPlaying&&!musicPlayPending&&!musicFailed)playBattleMusic()}
 ensureBattleMusic();
 ensureHomeMusic();

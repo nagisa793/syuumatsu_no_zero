@@ -67,21 +67,27 @@ function targetBracket(b,color,expanded=0){
 }
 function targetBadgeBounds(b){
  const p=bugPosition(b);
- return{x:Math.round(Math.max(39,Math.min(W-39,p.x)))-38,y:Math.round(Math.max(40,Math.min(H-36,p.y+18))),width:76,height:34};
+ return{x:Math.round(Math.max(34,Math.min(W-34,p.x)))-33,y:Math.round(Math.max(26,Math.min(H-21,p.y+18))),width:66,height:19};
+}
+function drawTargetTitle(){
+ const glyphs={T:['11111','00100','00100','00100','00100','00100','00100'],A:['01110','11011','11011','11111','11011','11011','11011'],R:['11110','11011','11011','11110','11100','11010','11011'],G:['01111','11000','11000','11011','11011','11011','01110'],E:['11111','11000','11000','11110','11000','11000','11111']};
+ g.save();g.fillStyle=state==='lock'?'#b5ffe2':'#f4ffff';
+ for(const [n,letter] of [...'TARGET'].entries())for(let y=0;y<7;y++)for(let x=0;x<5;x++)if(glyphs[letter][y][x]==='1')g.fillRect(310+n*24+x*4+Math.floor((6-y)*.6),11+y*4,4,4);
+ g.restore();
 }
 function drawCommandOverlay(){
  const selecting=state==='target'||state==='lock'||(state==='paused'&&['target','lock'].includes(beforePause));
  if(selecting){
-  g.save();g.globalCompositeOperation='multiply';g.fillStyle='#646464';g.fillRect(0,0,W,H);g.restore();
-  g.fillStyle='#07121ec9';g.fillRect(W/2-65,8,130,28);textPixel(state==='lock'?'TARGET LOCK':'TARGET',W/2,28,state==='lock'?'#a5ffe3':'#edf4ed',18,'center');
-  for(const b of bugs)if(b.hp>0){const chosen=b.id===targetId&&state==='lock',p=bugPosition(b),blink=chosen&&Math.floor(lockAge*9)%2===0;
-   if(blink)drawBugAnimated(b,p.x,p.y+12,bugTypes[b.type].size,true);
+  g.save();g.globalCompositeOperation='multiply';g.fillStyle='#797979';g.fillRect(0,0,W,H);g.restore();
+  drawTargetTitle();
+  const targets=bugs.filter(b=>b.hp>0&&!b.offscreen).sort((a,b)=>actorGroundAnchor(a).y-actorGroundAnchor(b).y);
+  for(const b of targets){const chosen=b.id===targetId&&state==='lock',p=bugPosition(b),blink=chosen&&Math.floor(lockAge*9)%2===0;
+   drawBugAnimated(b,p.x,p.y+12,bugTypes[b.type].size,blink);
    targetBracket(b,chosen?'#bcffde':'#a6b6c0',chosen?Math.max(0,7-lockAge*10):0);
    const badge=targetBadgeBounds(b),x=badge.x+badge.width/2,y=badge.y;
    g.fillStyle=chosen?'#b1ffe0':'#10283af2';g.fillRect(badge.x,y,badge.width,badge.height);
    g.strokeStyle=chosen?'#defff0':'#668f9d';g.lineWidth=1;g.strokeRect(badge.x+.5,y+.5,badge.width-1,badge.height-1);
-   textPixel(numberLabel(b.id),x,y+12,chosen?'#092025':'#c4dce2',10,'center');
-   textPixel('HP '+Math.ceil(b.hp),x,y+28,chosen?'#092025':'#fff1c3',14,'center');
+   textPixel(numberLabel(b.id),x,y+14,chosen?'#092025':'#e8fbff',12,'center');
   }
 
  }else if(state==='battle'){
@@ -95,6 +101,7 @@ function drawCommandOverlay(){
 let startRequested=false;
 function launchBattle(){const fromHome=state==='start';startRequested=false;reset();if(fromHome)beginHomeIntro()}
 function beginBattle(){
+ if(state==='start'&&typeof openingBlocksHome==='function'&&openingBlocksHome())return;
  if(state==='intro')return;
  if(assetFailed){$('reload').classList.remove('hidden');return}
  unlockAudio(true);

@@ -7,10 +7,11 @@ const math=Object.create(Math);math.random=()=>((seed=(seed*1664525+1013904223)>
 function element(id){const classes=new Set(),attrs={};return{id,style:{setProperty(){}},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){if(on===undefined)on=!classes.has(x);on?classes.add(x):classes.delete(x)}},setAttribute:(k,v)=>attrs[k]=v,getAttribute:k=>attrs[k],addEventListener(){},tagName:'BUTTON',children:[],appendChild(x){this.children.push(x)},textContent:'',_html:'',get innerHTML(){return this._html},set innerHTML(v){this._html=v;for(const m of v.matchAll(/id="([^"]+)"/g))els[m[1]]=element(m[1])},value:'',focus(){},disabled:false}}
 for(const match of fs.readFileSync(root+'index.html','utf8').matchAll(/id="([^"]+)"/g))els[match[1]]=element(match[1]);
 els.begin.disabled=/id="begin" disabled/.test(fs.readFileSync(root+'index.html','utf8'));
+els.touchbegin.disabled=true;
 const adapt=c=>{const orig=c.getContext.bind(c);c.getContext=(...a)=>{const t=orig(...a),draw=t.drawImage.bind(t);t.drawImage=(i,...args)=>draw(i.im||i,...args);return t};return c};
 els.game=adapt(createCanvas(960,540));
 els.homescene=adapt(createCanvas(960,540));
-class Image{set src(s){pending.push(loadImage(root+s).then(im=>{this.im=im;this.complete=true;this.naturalWidth=im.width;this.naturalHeight=im.height;this.onload?.()}))}}
+class Image{set src(s){pending.push(loadImage(root+s).then(im=>{this.im=im;this.complete=true;this.naturalWidth=im.width;this.naturalHeight=im.height;this.onload?.()}).catch(error=>{console.error('Image load failed:',s);throw error}))}}
 class Audio{constructor(src){this.src=src;this.paused=true;this.volume=1;this.currentTime=0;this.plays=0;this.pauses=0}addEventListener(){}play(){this.paused=false;this.plays++}pause(){this.paused=true;this.pauses++}}
 class AudioContext{
  constructor(){this.currentTime=0;this.sampleRate=8000;this.state='running';this.destination={};this.sources=[]}
@@ -20,7 +21,7 @@ class AudioContext{
  createBiquadFilter(){return{frequency:{value:1000,setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}}}
  createBuffer(channels,n){return{getChannelData:()=>new Float32Array(n)}}
  createBufferSource(){const s={connect(){},disconnect(){},start(t,offset){this.offset=offset;this.started=true},stop(){this.stopped=true}};this.sources.push(s);return s}
- decodeAudioData(){return Promise.resolve({duration:122.091})}
+ decodeAudioData(){if(this.decodeFailures){this.decodeFailures--;return Promise.reject(Error('temporary decode failure'))}return Promise.resolve({duration:122.091})}
 }
 class SpeechRecognition{set onresult(fn){this.resultHandler=fn}get onresult(){return this.resultHandler?(e)=>{this.resultHandler(e);waitVoice(0)}:null}constructor(){throw Error('No browser recognition allowed')}start(){this.started=true;this.onstart?.()}abort(){this.aborted=true;this.onend?.()}result(text,index=0,final=true){this.results[index]={0:{transcript:text},isFinal:final,length:1};this.onresult?.({resultIndex:index,results:this.results})}}
 const listeners={},context={console,Image,Audio,Math:math,Set,Uint8Array,Int32Array,Date,navigator:{mediaDevices:{getUserMedia(){throw Error('No site microphone capture allowed')}}},fetch:async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)}),setTimeout:(fn,ms=0)=>{const id=++timerId;timers.set(id,{fn,at:clock+ms});return id},clearTimeout:id=>timers.delete(id),requestAnimationFrame(fn){frames.push(fn)},localStorage:{getItem(){return null},setItem(){}},window:{AudioContext,SpeechRecognition,addEventListener:(n,fn)=>listeners[n]=fn},document:{documentElement:element('html'),body:element('body'),hidden:false,getElementById:id=>els[id]||null,createElement:t=>t==='canvas'?adapt(createCanvas(1,1)):element('created'),querySelectorAll:()=>[],addEventListener:(n,fn)=>listeners[n]=fn}};
@@ -30,6 +31,7 @@ for(const file of [...fs.readFileSync(root+'index.html','utf8').matchAll(/<scrip
  if(file!=='boot.js'){
   assert.equal(frames.length,0,'no rendering while a later script is still downloading: '+file);
   assert(els.begin.disabled,'no partially initialized start action: '+file);
+  assert(els.touchbegin.disabled,'TOUCH must wait until all game scripts are initialized: '+file);
  }
  if(file==='command.js'){
   // Cached core images can finish while later scripts are still in transit.
@@ -60,7 +62,8 @@ function captureOpening(name){
  run('state="paused";beforePause="start";advance(2);drawHomeScreen()');assert(movingSky.equals(els.homescene.toBuffer('image/png')),'settings must freeze the title animation');
  run('state="start";time='+skyStart);console.log('PASS title clock during loading, frozen settings and unchanged battle randomness.');
  run('draw()');assert.deepEqual([...els.game.getContext('2d').getImageData(480,380,1,1).data],[3,11,20,255],'the preloaded home view has no faint battlefield beneath it');
- els.begin.onclick();assert(run('startRequested'));assert.equal(run('state'),'start');
+ assert.equal(run('opening.phase'),'touch');assert.equal(run('audio'),null,'TOUCH must precede all audio output');
+ els.begin.onclick();assert(!run('startRequested'),'START is unavailable behind TOUCH');assert.equal(run('state'),'start');
  for(let i=0;i<pending.length;){const end=pending.length;await Promise.all(pending.slice(i,end));i=end}
  for(let t=0;t<180;t+=.5){
   const p=run('homeCircuitCamera('+t+')'),next=run('homeCircuitCamera('+(t+.5)+')');
@@ -83,6 +86,34 @@ function captureOpening(name){
   paint.drawImage(star,480*.65-w/2,270*.46-w/2,w,w);
   fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'home-button-shape.png'),art.toBuffer('image/png'));
  }
+ const filmFrames=[];
+ function captureFilm(name){run('drawHomeScreen()');const image=adapt(createCanvas(960,540));image.getContext('2d').drawImage(els.homescene,0,0);filmFrames.push({name,image})}
+ const initialSeed=seed,filmEvents={stopped:0,stopPropagation(){this.stopped++}};
+ assert(els.touchbegin.onclick(filmEvents));assert.equal(filmEvents.stopped,1);assert.equal(run('opening.phase'),'film');assert.equal(run('state'),'start');
+ assert(!els.touchbegin.onclick(filmEvents),'the first tap cannot start two films or accidentally skip');run('audio.decodeFailures=1');
+ await run('preparePrologueAudio()');await run('homeMusic.ready()');for(let i=0;i<12;i++)await Promise.resolve();
+ for(const [at,name] of [[.4,'STAR FRACTURE'],[1.7,'WHITE CRUMBLES'],[3.4,'CITY INFESTATION'],[6.4,'DATA COLLAPSE'],[7.6,'AKARI'],[8.85,'No.003! LONG SWORD'],[10.45,'ZERO WINDUP'],[10.75,'WHITE SLASH'],[11.2,'BUG DELETION'],[12.3,'WHITEOUT']]){
+  run('advance('+(at-run('opening.age'))+')');captureFilm(name);
+  assert.equal(run('opening.phase'),'film');assert(run('homeMusic.paused'),'the title loop must not leak into the film');
+ }
+ assert.equal(seed,initialSeed,'film effects must never consume the battle RNG');assert.equal(run('hp'),200);assert.equal(run('energy'),100);assert.equal(run('elapsed'),0);
+ assert(run('prologueScore.source&&!prologueScore.source.loop'));assert(run('prologueEffects.source&&!prologueEffects.source.loop'));
+ for(const cel of run('prologueZero')){const data=cel.getContext('2d').getImageData(0,0,cel.width,cel.height).data;let solid=0;for(let i=0;i<data.length;i+=4)if(data[i+3]>0){solid++;assert.equal(data[i]+data[i+1]+data[i+2],0,'Zero, wings and sword must be pure black')}assert(solid>1000)}
+ run('advance(1)');for(let i=0;i<12;i++)await Promise.resolve();assert.equal(run('opening.phase'),'home');assert(run('prologueScore.paused&&prologueEffects.paused'));assert(run('homeMusic.source.started&&!homeMusic.paused'));
+ for(const at of [0,.3,2,4,7.6,8.9,10.7,12.3]){
+  run('opening.phase="touch";state="start";updateOpeningGate();stopHomeMusic()');assert(els.touchbegin.onclick(filmEvents));run('advance('+at+')');
+  assert(els.skipopening.onclick(filmEvents));for(let i=0;i<12;i++)await Promise.resolve();
+  assert.equal(run('opening.phase'),'home');assert.equal(run('state'),'start');assert(run('prologueScore.paused&&prologueEffects.paused'));
+  assert(run('homeMusic.source.started&&!homeMusic.paused'),'every skip starts the home loop immediately');
+  const homeLoop=run('homeMusic.source');assert(!els.skipopening.onclick(filmEvents));run('advance(.1)');assert.equal(run('homeMusic.source'),homeLoop,'a duplicate skip cannot restart the loop or launch battle');
+ }
+ run('opening.phase="touch";state="start";updateOpeningGate();stopHomeMusic()');els.touchbegin.onclick(filmEvents);run('advance(3.5)');const filmAge=run('opening.age');els.settings.onclick();run('advance(1)');assert.equal(run('opening.age'),filmAge);assert(run('prologueScore.paused&&prologueEffects.paused'));els.settingsresume.onclick();run('advance(.1)');assert(run('opening.age')>filmAge);assert(run('prologueScore.source.started'));els.skipopening.onclick(filmEvents);
+ run('opening.phase="touch";state="start";updateOpeningGate();stopHomeMusic()');els.touchbegin.onclick(filmEvents);run('audio.state="suspended";audio.blockedResume=true;advance(.6)');assert.equal(run('opening.age'),0,'film clock must wait for output activation');run('audio.blockedResume=false;unlockAudio(true);advance(.2)');assert(run('opening.age')>0);els.skipopening.onclick(filmEvents);
+ if(process.env.ZERO_RENDER_OUT){const sheet=createCanvas(960*2,574*Math.ceil(filmFrames.length/2)),p=sheet.getContext('2d');p.fillStyle='#06111d';p.fillRect(0,0,sheet.width,sheet.height);p.font='bold 20px monospace';for(const [i,f] of filmFrames.entries()){const x=i%2*960,y=Math.floor(i/2)*574;p.fillStyle='#baffeb';p.fillText(f.name,x+16,y+25);p.drawImage(f.image,x,y+34)}fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'prologue-contact-sheet.png'),sheet.toBuffer('image/png'));}
+ run('opening.phase="touch";state="start";updateOpeningGate();stopHomeMusic();prologueScore.buffer=null;prologueScore.decoding=null;prologueScore.bytes=new Promise(resolve=>globalThis.releaseFilmBytes=resolve);prologueAudioWarm=null;prologueAudioReady=false');
+ els.touchbegin.onclick(filmEvents);assert(els.skipopening.onclick(filmEvents));run('releaseFilmBytes(new ArrayBuffer(8))');await run('preparePrologueAudio()');for(let i=0;i<12;i++)await Promise.resolve();
+ assert.equal(run('opening.phase'),'home');assert(run('prologueScore.paused&&!prologueScore.source&&prologueEffects.paused&&!prologueEffects.source'),'a delayed film decode cannot play after skipping');assert(run('homeMusic.source.started'));
+ console.log('PASS TOUCH activation, all film cuts, pure black Zero, frozen battle/RNG, phase-by-phase and pending-decode skip, no ghost START, immediate home loop and presentation pause/resume.');
  const homeSource=fs.readFileSync(root+'intro.js','utf8'),homeHTML=fs.readFileSync(root+'index.html','utf8');
  const phone=run('homePhoneBounds()');assert.equal(phone.height,158);assert.equal(phone.angle,Math.PI/6);
  const halfW=(phone.width*Math.cos(phone.angle)+phone.height*Math.sin(phone.angle))/2,halfH=(phone.width*Math.sin(phone.angle)+phone.height*Math.cos(phone.angle))/2;
@@ -92,7 +123,7 @@ function captureOpening(name){
  assert(homeHTML.includes('aria-label="START"><span class="start-star-label" aria-hidden="true">START'));
  const startGraphic=fs.readFileSync(root+'assets/home/start-star-v83.svg','utf8');assert(startGraphic.includes('id="start-lettering"'));assert(!startGraphic.includes('<text'));
  const title=run('homeTitleBounds()');assert(Math.abs(480*.65-(title.x+title.width*.5))<3,'START is horizontally above the の in the title');
- assert.equal(run('state'),'intro');assert(run('homeIntroActive()'));await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();
+ els.begin.onclick();assert.equal(run('state'),'intro');assert(run('homeIntroActive()'));await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();
  const openingSource=Array.from(run('akariVoiceSources'))[0];assert.equal(openingSource.akariCueName,'エンコードゼロ！');
  const timing=run('homeIntroTiming()'),initialEnemies=run('JSON.stringify(bugs.map(b=>[b.c,b.r,b.hp]))');
  run('advance(.6)');assert.equal(run('zeroArrivalProgress()'),0);captureOpening('ENCODE');
@@ -130,22 +161,24 @@ function captureOpening(name){
  fresh();run('beginHomeIntro();audio.blockedResume=true;audio.state="suspended";advance(6)');assert.equal(run('state'),'target','an unavailable output must not trap the player forever');run('audio.blockedResume=false;audio.state="running"');
  console.log('PASS delayed output activation preserves the opening voice/animation clock, with a bounded fallback when output stays unavailable.');
 
- // Exercise the actual TARGET painter: HP must be drawn after the dimmer,
- // alongside each enemy number, including the selected enemy's lock flash.
+ // In-world targeting prioritizes the bug and its number. HP appears only in
+ // the external target buttons, including during the selected lock flash.
  fresh();run('bugs[0].hp=37.2;bugs[1].hp=20;beginTarget();updateHud()');
  const paint=run('g'),originalFill=paint.fillRect.bind(paint),originalText=paint.fillText.bind(paint),paintLog=[];
  paint.fillRect=function(...a){paintLog.push({kind:'fill',blend:paint.globalCompositeOperation});return originalFill(...a)};
  paint.fillText=function(text,...a){paintLog.push({kind:'text',text,font:paint.font});return originalText(text,...a)};
  run('drawCommandOverlay()');
  const dimmer=paintLog.findIndex(e=>e.kind==='fill'&&e.blend==='multiply');assert(dimmer>=0);
- for(const label of ['No.001','No.002','HP 38','HP 20'])assert(paintLog.findIndex(e=>e.text===label)>dimmer,label+' must remain readable above TARGET dimming');
- assert(paintLog.some(e=>e.text==='HP 38'&&e.font.includes('14px')));
+ for(const label of ['No.001','No.002'])assert(paintLog.findIndex(e=>e.text===label)>dimmer,label+' must remain readable above TARGET dimming');
+ assert(!paintLog.some(e=>e.kind==='text'&&String(e.text).startsWith('HP ')),'no duplicate HP over the bug');
+ assert(paintLog.some(e=>e.text==='No.001'&&e.font.includes('12px')));
  assert(els.targetchoices.innerHTML.includes('HP 38'));assert(els.targetchoices.innerHTML.includes('HP 20'));
  const badge=run('targetBadgeBounds(bugs[0])');assert(badge.x>=0&&badge.y>=0&&badge.x+badge.width<=480&&badge.y+badge.height<=270);
  assert(run('selectTargetAt('+ (badge.x+badge.width/2)+','+(badge.y+badge.height-3)+')'));
- paintLog.length=0;run('drawCommandOverlay()');assert(paintLog.some(e=>e.text==='HP 38'));assert.equal(run('targetId'),1);
+ paintLog.length=0;run('drawCommandOverlay()');assert(!paintLog.some(e=>e.kind==='text'&&String(e.text).startsWith('HP ')));assert.equal(run('targetId'),1);
  paint.fillRect=originalFill;paint.fillText=originalText;
- console.log('PASS TARGET and lock display current enemy HP above the dimmer; the complete HP/number badge remains tappable.');
+ if(process.env.ZERO_RENDER_OUT){run('state="target";draw()');fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'target-numbers-only.png'),els.game.toBuffer('image/png'))}
+ console.log('PASS TARGET and lock show large numbers without HP duplicates; external HP stays current and number badges remain tappable.');
 
  // The visible canvas can be letterboxed on shorter screens. Test the same
  // coordinate conversion that the pointer handler uses, rather than a copy.
