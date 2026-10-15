@@ -1,0 +1,16 @@
+{
+  "model": "onnx-community/whisper-small",
+  "revision": "36050c46d777d46dc4b5f43f6d90574fc38f8732",
+  "dtype": "q8",
+  "runtime": "shipped single-thread WASM in Node (file transport adapter)",
+  "synthetic": true,
+  "created": "2026-10-14T08:27:50.984Z",
+  "results": {
+    "guns": {
+      "reference": "ファイル、ガンズ、ナンバー、二、エンター",
+      "seconds": 4.405,
+      "text": "ファイル ダンズ ナンバー2エンターハー",
+      "milliseconds": 15170.056774
+    }
+  }
+}

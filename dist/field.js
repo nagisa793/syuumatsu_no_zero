@@ -9,10 +9,12 @@ function isHole(c,r){return (panelHoles.get(cellId(c,r))||0)>0}
 function groundTrapped(){return layer===0&&isHole(col,row)}
 function canUsePanel(team,c,r,l=0){return c>=0&&c<6&&r>=0&&r<3&&panelOwners[cellId(c,r)]===team&&(l===1||!isHole(c,r))}
 function bugCanFly(b){return b.type==='bee'||b.type==='fly'}
-function bugCells(b,c=b.c,r=b.r){return Array.from({length:b.widthTiles||1},(_,i)=>({c:c+i,r}))}
+function bugWidth(b){return b.type==='beetle'?1:b.widthTiles||1}
+function bugCells(b,c=b.c,r=b.r){return Array.from({length:bugWidth(b)},(_,i)=>({c:c+i,r}))}
 function panelOccupied(c,r){
  if(col===c&&row===r||moveAnim?.sourceC===c&&moveAnim?.sourceR===r)return true;
- return bugs.some(b=>b.hp>0&&(bugCells(b).some(p=>p.c===c&&p.r===r)||b.motion&&bugCells(b,b.motion.c,b.motion.r).some(p=>p.c===c&&p.r===r)));
+ const cells=(b,x=b.c,y=b.r,l=b.layer)=>typeof errorCollisionCells==='function'?errorCollisionCells(b,x,y,l):bugCells(b,x,y);
+ return bugs.some(b=>b.hp>0&&(cells(b).some(p=>p.c===c&&p.r===r)||b.motion&&cells(b,b.motion.c,b.motion.r,b.motion.layer??b.layer).some(p=>p.c===c&&p.r===r)));
 }
 function areaCandidates(card){
  const owner=card.steal?'bugs':'zero',cells=[];
@@ -44,8 +46,8 @@ function applyArea(card){
   msg('ホールアウト！ 空きパネルが10秒間、穴になるよ。');return;
  }
  const cells=areaCandidates(card).slice(0,card.steal||card.give);
- for(const p of cells){const id=cellId(p.c,p.r);panelOwners[id]=card.steal?'zero':'bugs';if(card.steal)capturedPanels.set(id,15);else capturedPanels.delete(id);panelChanges.push({...p,life:.8,owner:card.steal?'zero':'bugs'})}
- if(card.areaHeal){hp=Math.min(MAX_HP,hp+card.areaHeal);effects.push({kind:'heal',...pos(col,row,layer),life:.7,max:.7})}
+ for(const [index,p] of cells.entries()){const id=cellId(p.c,p.r);panelOwners[id]=card.steal?'zero':'bugs';if(card.steal)capturedPanels.set(id,15);else capturedPanels.delete(id);panelChanges.push({...p,life:1.2+index*.09,max:1.2,delay:index*.09,owner:card.steal?'zero':'bugs',capture:!!card.steal,sourceC:col,sourceR:row})}
+ if(card.areaHeal){hp=Math.min(MAX_HP,hp+card.areaHeal);effects.push({kind:'heal',r:row,layer,...pos(col,row,layer),life:.7,max:.7})}
  if(card.nextPower)nextAttackPower=card.nextPower;
  msg(card.steal?`${cells.length}マス奪取！ 青いパネルへ移動できるよ。`:card.areaHeal?`${cells.length}マス譲渡。HPを${card.areaHeal}回復！`:`${cells.length}マス譲渡。次の攻撃1回が${card.nextPower}倍！`);
 }
@@ -90,27 +92,58 @@ function tickField(dt){
   // Air and ground are struck at different heights by the same physical drop.
   for(const b of bugs){
    const arrival=b.layer?.64:.92;
-   if(b.hp>0&&!drop.hit.has(b.id)&&drop.age>=arrival&&drop.age<arrival+.14&&drop.cells.some(p=>bugCells(b).some(q=>p.c===q.c&&p.r===q.r))){
-    drop.hit.add(b.id);hit(b,drop.damage);b.stun=Math.max(b.stun||0,drop.stun);
+   const impactLayer=b.type==='error'&&b.phase===1&&drop.age>=.64&&drop.age<.78?1:b.layer;
+   if(b.hp>0&&!drop.hit.has(b.id)&&(drop.age>=arrival&&drop.age<arrival+.14||b.type==='error'&&impactLayer===1)){
+    const struck=drop.cells.flatMap(p=>(typeof enemyHitCells==='function'?enemyHitCells(b,impactLayer):bugCells(b)).filter(q=>p.c===q.c&&p.r===q.r));
+    if(!struck.length)continue;drop.hit.add(b.id);strikeEnemy(b,drop.damage,struck.some(p=>p.part==='head')?'head':'body');b.stun=Math.max(b.stun||0,drop.stun);
    }
   }
-  if(!drop.impact&&drop.age>=.92){drop.impact=true;screenShake=Math.max(screenShake,5);sfx('explode');for(const p of drop.cells)effects.push({kind:'gravityImpact',...pos(p.c,p.r),life:.42,max:.42})}
+  if(!drop.impact&&drop.age>=.92){drop.impact=true;screenShake=Math.max(screenShake,5);sfx('explode');for(const p of drop.cells)effects.push({kind:'gravityImpact',r:p.r,layer:0,...pos(p.c,p.r),life:.42,max:.42})}
  }
  gravityDrops=gravityDrops.filter(d=>d.age<d.duration);
 }
 
-function drawFieldEffects(){
- for(const p of panelChanges){g.save();g.globalAlpha=p.life;panel(p.c,p.r,p.owner==='zero'?'#99ffe998':'#ff9d9f98','#e7fff7');g.restore()}
- for(const drop of gravityDrops){
+function drawPanelChanges(){
+ for(const p of panelChanges){
+  g.save();
+  if(!p.capture){g.globalAlpha=Math.min(1,p.life);panel(p.c,p.r,p.owner==='zero'?'#99ffe998':'#ff9d9f98','#e7fff7');g.restore();continue}
+  const age=(p.max||1.2)-p.life;if(age<0){g.restore();continue}
+  const q=pos(p.c,p.r),origin=pos(p.sourceC,p.sourceR),fade=Math.min(1,p.life*3),enemy=p.owner==='bugs';
+  const ink=enemy?'#ffd2da':'#e1fff8',edge=enemy?'#ff9caa':'#b5fff0';
+  // The capturing actor sends a packet and wipes the panel into its own colour.
+  if(age<.22){
+   panel(p.c,p.r,enemy?'#1b5a6599':'#552b4699',enemy?'#b7fff0':'#ffc7da');const t=age/.22;
+   g.fillStyle=ink;g.fillRect(Math.round(origin.x+(q.x-origin.x)*t)-4,Math.round(origin.y+(q.y-origin.y)*t)-3,8,6);
+  }else{
+   const sweep=Math.min(1,(age-.22)/.28);
+   g.beginPath();g.rect(q.x-36,q.y-12,72*sweep,34);g.clip();
+   panel(p.c,p.r,enemy?'#ff667b70':'#7cffe15c',ink);g.fillStyle=ink;g.fillRect(q.x-36+Math.round(72*sweep)-2,q.y-12,3,34);
+  }
+  g.restore();g.save();g.globalAlpha=fade;
+  if(age>=.5){
+   const lift=Math.min(13,(age-.5)*23);g.strokeStyle=edge;g.lineWidth=1;
+   g.strokeRect(q.x-35,q.y-12-lift,70,34);g.strokeStyle=enemy?'#ff718955':'#86f7df55';g.strokeRect(q.x-35,q.y-12,70,34);
+   textPixel(enemy?'LOST':'GET',q.x,q.y-18-lift,ink,10,'center');
+   g.fillStyle=edge;for(let k=0;k<4;k++)g.fillRect(Math.round(q.x-25+k*16),Math.round(q.y-16-age*14-(k%2)*7),2,3);
+  }
+  g.restore();
+ }
+}
+function drawGravityDrop(drop){
+
   for(const p of drop.cells){const ground=pos(p.c,p.r),air=pos(p.c,p.r,1);ring(ground.x,ground.y+8,20,'#ffe196',.7);if(drop.age<.64){ring(air.x,air.y+8,16,'#d8b1ff',.9);g.fillStyle='#ffe095';g.fillRect(air.x-1,air.y-10,2,11)}}
-  if(drop.age<.3)continue;
+  if(drop.age<.3)return;
   const p=pos(drop.c,drop.r),airY=pos(drop.c,drop.r,1).y-20,groundY=p.y-20;
   const t=Math.max(0,Math.min(1,(drop.age-.3)/.34));
   const y=drop.age<.64?-50+(airY+50)*t*t:airY+(groundY-airY)*Math.min(1,(drop.age-.64)/.28);
   // A single-cell drop fills the projected cell's 57 px horizontal span.
   const frame=animationSheets.gravity?.frames[drop.num-1],width=58,height=frame?Math.ceil(frame.height*width/frame.width):120;
   if(drop.age<1.02){g.save();g.globalAlpha=Math.min(1,(1.02-drop.age)*10);drawEquipment('gravity',drop.num,p.x,y,width,height,1,1,drop.num===1?0:Math.PI);g.restore()}
- }
+
+}
+function fieldDrawEntries(){return gravityDrops.map(drop=>({depth:pos(0,drop.r).y+.2,draw:()=>drawGravityDrop(drop)}))}
+function drawFieldEffects(){
+
  if(groundTrapped()){
   const p=pos(col,row),x=Math.max(91,Math.min(385,p.x));
   g.fillStyle='#25172bea';g.fillRect(x-86,p.y-95,172,21);

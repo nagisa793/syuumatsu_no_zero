@@ -2,8 +2,9 @@
 
 // A second encounter; its entry battery is also the checkpoint for retries.
 let encounter='skirmish',encounterBattery=100,encounterHP=MAX_HP,poisonActive=false,poisonClock=0,bossHazards=[],bossPhaseFlash=0;
+const MIDBOSS_SCALE=1.15,MIDBOSS_WIDTH=114*MIDBOSS_SCALE;
 let bossArtState='loading',pendingNextEncounter=false;
-bugTypes.grenade={name:'グレネードウィービル',aliases:['ゾウムシ','ぞうむし','手榴弾','中ボス','グレネード','ウィービル'],flying:true,size:108,hp:150,kind:'blast',damage:30};
+bugTypes.grenade={name:'グレネードウィービル',aliases:['ゾウムシ','ぞうむし','手榴弾','中ボス','グレネード','ウィービル'],flying:true,size:108*MIDBOSS_SCALE,hp:150,kind:'blast',damage:30};
 bugNames.grenade=bugTypes.grenade.name;
 function createMidboss(){return {id:1,type:'grenade',widthTiles:2,c:4,r:1,layer:0,hp:150,max:150,phase:1,cd:1.8,tell:0,hit:0,stun:0,motion:null,stepWait:1.2,attackPose:0,attack:null,cycle:0,suction:0,pullClock:0,suctionClock:0,targetLayer:0,aimRow:1}}
 
@@ -15,12 +16,8 @@ function splitBossSheet(image){
   const cell=document.createElement('canvas');cell.width=w;cell.height=h;const t=cell.getContext('2d');
   t.drawImage(image,x,y,w,h,0,0,w,h);const pixels=t.getImageData(0,0,w,h),d=pixels.data,seen=new Uint8Array(w*h),queue=new Int32Array(w*h);let largest=[];
   for(let i=0;i<w*h;i++){const k=i*4;if(d[k]>80&&d[k+2]>80&&d[k+1]<Math.min(d[k],d[k+2])*.65&&Math.abs(d[k]-d[k+2])<70)d[k+3]=0}
-  for(let start=0;start<w*h;start++){
-   if(seen[start]||d[start*4+3]<32)continue;let head=0,tail=1;queue[0]=start;seen[start]=1;
-   const add=i=>{if(i>=0&&i<w*h&&!seen[i]&&d[i*4+3]>=32){seen[i]=1;queue[tail++]=i}};
-   while(head<tail){const i=queue[head++];if(i%w)add(i-1);if(i%w<w-1)add(i+1);add(i-w);add(i+w)}
-   if(tail>largest.length)largest=Array.from(queue.subarray(0,tail));
-  }
+  pruneCelFragments(pixels,w,h);
+  for(let j=0;j<w*h;j++)if(d[j*4+3]>=12)largest.push(j);
   if(largest.length<500)throw new Error('Boss sprite missing');
   const keep=new Uint8Array(w*h);let left=w,right=0,top=h,bottom=0;
   for(const i of largest){keep[i]=1;left=Math.min(left,i%w);right=Math.max(right,i%w);top=Math.min(top,Math.floor(i/w));bottom=Math.max(bottom,Math.floor(i/w))}
@@ -39,7 +36,7 @@ function bossArtFailure(){bossArtState='failed';pendingNextEncounter=false;$('ne
 function startNextEncounter(){
  if(state!=='win'||encounter!=='skirmish')return false;
  if(bossArtState!=='ready'||!bindSpriteReady){pendingNextEncounter=true;$('nextEnemy').disabled=true;$('nextEnemy').textContent='中ボスを準備中…';if(bossArtState==='failed'){loadBossSprites();if(!bindSpriteReady)boundImage.src='assets/animation/boss-bind-integrated.png'}return false}
- encounterBattery=energy;encounterHP=hp;encounter='boss';pendingNextEncounter=false;beginVoiceBattle();return true;
+ encounterBattery=energy;encounterHP=hp;encounter='boss';pendingNextEncounter=false;beginBattle();return true;
 }
 const encounterReset=reset,encounterCheckEnd=checkEnd;
 reset=function(withIntro=true){
@@ -47,20 +44,23 @@ reset=function(withIntro=true){
  encounterReset(withIntro);
  if(encounter==='boss'){energy=encounterBattery;hp=encounterHP;bugs=[createMidboss()];targetId=1;targetPinned=false}
  $('restartAll').classList.add('hidden');$('nextEnemy').classList.add('hidden');$('nextEnemy').disabled=false;$('nextEnemy').textContent='次の敵と戦う';updateHud();
+ $('retry').classList.remove('hidden');
 };
 checkEnd=function(){
  const wasBattle=state==='battle';encounterCheckEnd();
  if(wasBattle&&(state==='win'||state==='lose')){
   for(const b of bugs)b.suction=0;bossHazards=[];poisonActive=false;poisonClock=0;bossPhaseFlash=0;
   $('nextEnemy').classList.toggle('hidden',!(state==='win'&&encounter==='skirmish'));
-  $('restartAll').classList.toggle('hidden',!(encounter==='boss'&&state==='win'));
+  $('restartAll').classList.toggle('hidden',encounter!=='boss');
+  $('retry').classList.toggle('hidden',encounter==='boss'&&state==='lose');
   if(encounter==='boss'&&state==='win'){$('resultlabel').textContent='MIDBOSS CLEAR';$('resulttitle').textContent='BUG DELETED'}
  }
 };
 $('nextEnemy').onclick=startNextEncounter;
-function startFromBeginning(){encounter='skirmish';encounterBattery=100;encounterHP=MAX_HP;beginVoiceBattle()}
+function startFromBeginning(){encounter='skirmish';encounterBattery=100;encounterHP=MAX_HP;beginBattle()}
 $('restartAll').onclick=startFromBeginning;
-function zeroBound(){return bugs.some(b=>b.type==='grenade'&&(b.hp>0||state==='win'||state==='lose')&&b.bindAge!==undefined)}
+$('retry').onclick=function(){return state==='lose'&&['boss','error'].includes(encounter)?startFromBeginning():beginBattle()};
+function zeroBound(){return !!(spiderBind&&spiderBind.releaseAge===null)||bugs.some(b=>b.type==='grenade'&&(b.hp>0||state==='win'||state==='lose')&&b.bindAge!==undefined)}
 function releaseBossSuction(b){
  delete b.bindAge;delete b.bindPulses;
  b.suction=0;snared=0;
@@ -78,7 +78,7 @@ function enterBossAirPhase(b){
  if(activeOrder?.card.damage&&!activeOrder.card.drop&&!attackLayerMatches(activeOrder.card,b)){
   finishOrder('標的が飛行したため指示を終了');transformation=null;actionLock=0;
  }
- poisonActive=true;poisonClock=0;bossPhaseFlash=1.8;screenShake=5;voice(2,[95,140,220,330],.5,.08);voice(3,[],.32,.07);
+ beginPhaseTransition('boss',b);poisonActive=true;poisonClock=0;bossPhaseFlash=1.8;screenShake=5;voice(2,[95,140,220,330],.5,.08);voice(3,[],.32,.07);
  msg('翼が開いた！ 地上が毒に侵されている。ウィングで回避！！');
 }
 const encounterHit=hit;
@@ -93,6 +93,7 @@ function beginBossAttack(b,kind){
 }
 function suctionFront(r,l){let front=-1;for(let c=0;c<6;c++)if(canUsePanel('zero',c,r,l))front=c;return front}
 function startBossBinding(b){
+ interruptZeroForForce('吸い込みで技を中断');
  b.suction=0;b.attack='bind';b.bindAge=0;b.bindPulses=0;moveAnim=null;holding=false;charge=0;pendingMove=pendingShot=null;
  if(transformation){transformation=null;if(activeOrder)activeOrder.phase='queued'}
  appearance.body='base';loadout.weapon=null;pose='hurt';poseTime=0;snared=0;
@@ -106,7 +107,7 @@ function tickBossBinding(b,dt){
  if(b.bindAge>=3-1e-8){releaseBossSuction(b);b.attack=null;b.cd=2;b.stepWait=.8;pose='idle'}
 }
 function tickMidboss(b,dt){
- if(b.hp<=0)return;enterBossAirPhase(b);b.hit=Math.max(0,b.hit-dt);b.attackPose=Math.max(0,b.attackPose-dt);if(b.attack==='slam'&&!b.attackPose)b.attack=null;
+ if(phaseTransition||b.hp<=0)return;enterBossAirPhase(b);b.hit=Math.max(0,b.hit-dt);b.attackPose=Math.max(0,b.attackPose-dt);if(b.attack==='slam'&&!b.attackPose)b.attack=null;
  const moveDt=dt*1.25*(b.phase===2?1.15:1);
  if(b.motion){b.motion.age+=b.motion.duration===.75?dt:moveDt;if(b.motion.age>=b.motion.duration)b.motion=null}
  if(b.bindAge!==undefined){tickBossBinding(b,dt);return}
@@ -115,12 +116,17 @@ function tickMidboss(b,dt){
  if(b.suction>0){
   b.suction=Math.max(0,b.suction-dt);b.pullClock+=dt;
   const front=suctionFront(row,layer);
-  if(front>=0&&col===front&&row===b.r&&!moveAnim&&!techniqueLock){startBossBinding(b);return}
-  if(b.pullClock>=.26){b.pullClock-=.26;
-   if(front>col&&!moveAnim&&!techniqueLock){let next=col+1;
-    while(next<front&&!canUsePanel('zero',next,row,layer))next++;
-    if(canUsePanel('zero',next,row,layer)){beginMove(next,row);snared=.3;moveCd=.3;pendingMove=null}
+  if(front>=0&&col===front&&row===b.r){startBossBinding(b);return}
+  while(b.pullClock>=.10){b.pullClock-=.10;
+   if(front>col){let next=col+1;while(next<front&&!canUsePanel('zero',next,row,layer))next++;
+    if(canUsePanel('zero',next,row,layer)){
+     const from=zeroVisualPosition();from.y-=(ZERO_SIZE-72)*layer;
+     interruptZeroForForce('吸引で技を中断');moveAnim=null;
+     if(beginMove(next,row,layer)){moveAnim.from=from;moveAnim.duration=.075;moveAnim.forced=true}
+     snared=0;moveCd=.03;pendingMove=null;
+    }
    }
+   if(front>=0&&col===front&&row===b.r){startBossBinding(b);return}
   }
   if(!b.suction){releaseBossSuction(b);b.attack=null;b.cd=2;b.stepWait=.4}return;
  }
@@ -137,10 +143,11 @@ function tickMidboss(b,dt){
 }
 const encounterTickBugs=tickBugs,encounterBugPosition=bugPosition;
 tickBugs=function(dt){if(encounter==='boss'){for(const b of bugs)tickMidboss(b,dt)}else encounterTickBugs(dt)};
-bugPosition=function(b){const p=encounterBugPosition(b);return b.widthTiles?{x:p.x+(b.widthTiles-1)*76/2,y:p.y}:p};
+bugPosition=function(b){const p=encounterBugPosition(b);return bugWidth(b)>1?{x:p.x+(bugWidth(b)-1)*76/2,y:p.y}:p};
 function tickBossWorld(dt){
+ if(phaseTransition)return;
  for(const h of bossHazards){h.age+=dt;if(!h.hit&&h.age>=h.delay){h.hit=true;screenShake=6;sfx('explode');
-  for(const p of h.cells)effects.push({kind:'bossBlast',...pos(p.c,p.r,h.layer),life:.75,max:.75});
+  for(const p of h.cells)effects.push({kind:'bossBlast',r:p.r,layer:h.layer,...pos(p.c,p.r,h.layer),life:.75,max:.75});
   if(layer===h.layer&&h.cells.some(p=>p.c===col&&p.r===row))hurt(h.damage,bugs.find(b=>b.type==='grenade')?.c);
  }}
  bossHazards=bossHazards.filter(h=>h.age<h.duration);bossPhaseFlash=Math.max(0,bossPhaseFlash-dt);
@@ -167,9 +174,9 @@ function drawBossTerrain(){
  if(boss){for(const cell of bugCells(boss)){const p=pos(cell.c,cell.r);ring(p.x,p.y+10,20,boss.layer?'#92edf0':'#e8c780',.55)}}
  if(poisonActive){
   for(let r=0;r<3;r++)for(let c=0;c<6;c++){
-   panel(c,r,isHole(c,r)?'#b95aed15':'#833a8e85','#b880c4');
+   const reveal=phasePoisonReveal(c,r);if(reveal<=0)continue;g.save();g.globalAlpha=reveal;panel(c,r,isHole(c,r)?'#b95aed15':'#833a8e85','#b880c4');
    const p=pos(c,r);g.fillStyle='#d2ed8070';
-   for(let i=0;i<3;i++){const yy=((simTime*12+i*11+c*4)%25);g.fillRect(Math.round(p.x-16+i*14),Math.round(p.y+15-yy),2,2)}
+   for(let i=0;i<3;i++){const yy=((simTime*12+i*11+c*4)%25);g.fillRect(Math.round(p.x-16+i*14),Math.round(p.y+15-yy),2,2)}g.restore()
 
   }
  }
@@ -181,15 +188,15 @@ function drawBossTerrain(){
  if(b?.attack==='suction'){
   for(let l=0;l<2;l++)for(let r=0;r<3;r++){
    const front=suctionFront(r,l);if(front<0)continue;const end=pos(front,r,l);
-   for(let i=0;i<12;i++){const t=(simTime*(b.suction?1.8:.7)+i/12)%1,start=pos(0,r,l);g.fillStyle=i%3?'#a2e9e980':'#eeffff';g.fillRect(Math.round(start.x+(end.x-start.x+20)*t-15),Math.round(start.y-18+Math.sin(i*2.1+simTime*8)*8),4,1)}
+   for(let i=0;i<12;i++){const t=(simTime*(b.suction?6.5:1.5)+i/12)%1,start=pos(0,r,l);g.fillStyle=i%3?'#a2e9e980':'#eeffff';g.fillRect(Math.round(start.x+(end.x-start.x+20)*t-15),Math.round(start.y-18+Math.sin(i*2.1+simTime*8)*8),4,1)}
   }
  }
 
 }
 function drawMidboss(b,x,feet,white){
  const sheet=animationSheets.boss;if(!sheet||b.bindAge!==undefined&&bindSpriteReady)return;
- const attacking=(b.attack==='suction'||b.attack==='bind')?2:b.attack==='blast'||b.attackPose>0?3:Math.floor(simTime/(b.layer?.15:.4))%2;
- const index=(b.layer?4:0)+attacking,f=sheet.frames[index],w=b.layer?Math.round(114*f.width/sheet.frames[0].width):114,h=Math.round(f.height*w/f.width),bob=Math.sin(simTime*(b.layer?4:2))*1.5;
+ const attacking=(b.attack==='suction'||b.attack==='bind')?2:b.attack==='blast'||b.attackPose>0?3:Math.floor(simTime/(b.layer?.3:.5))%2;
+ const index=(b.layer?4:0)+attacking,f=sheet.frames[index],w=b.layer?Math.round(MIDBOSS_WIDTH*f.width/sheet.frames[0].width):Math.round(MIDBOSS_WIDTH),h=Math.round(f.height*w/f.width),bob=Math.sin(simTime*(b.layer?4:2))*1.5;
 
  const rising=b.motion&&b.motion.duration===.75,t=rising?Math.min(1,b.motion.age/.75):1;
  g.save();
@@ -201,7 +208,7 @@ function drawMidboss(b,x,feet,white){
 const encounterDrawBug=drawBugAnimated;
 drawBugAnimated=function(b,x,y,size,white=false){if(b.type==='grenade')drawMidboss(b,x,y,white||b.hit>.08);else encounterDrawBug(b,x,y,size,white)};
 const encounterReadState=readState;
-readState=function(){return {...encounterReadState(),encounter,entryBattery:encounterBattery,entryHP:encounterHP,maxHP:MAX_HP,poison:poisonActive,poisonLayer:'ground',poisonDamagePerSecond:poisonActive?3:0,enemies:bugs.map(b=>({number:b.id,type:b.type,canFly:bugCanFly(b),hp:b.hp,maxHp:b.max,row:b.r,col:b.c,widthTiles:b.widthTiles||1,phase:b.phase||1,layer:b.layer?'air':'ground'}))}};
+readState=function(){return {...encounterReadState(),encounter,entryBattery:encounterBattery,entryHP:encounterHP,maxHP:MAX_HP,poison:poisonActive,poisonLayer:'ground',poisonDamagePerSecond:poisonActive?3:0,enemies:bugs.map(b=>({number:b.id,type:b.type,canFly:bugCanFly(b),hp:b.hp,maxHp:b.max,row:b.r,col:b.c,widthTiles:bugWidth(b),phase:b.phase||1,layer:b.layer?'air':'ground'}))}};
 window.zeroBattle={...window.zeroBattle,reset,readState,startNextEncounter};
 loadBossSprites();
 
@@ -216,13 +223,7 @@ boundImage.onload=()=>{
   const c=document.createElement('canvas');c.width=w;c.height=h;const t=c.getContext('2d');t.drawImage(boundImage,x,y,w,h,0,0,w,h);
   // Exclude disconnected fragments of neighbouring cels at atlas boundaries.
   const pixels=t.getImageData(0,0,w,h),data=pixels.data,seen=new Uint8Array(w*h),queue=new Int32Array(w*h);let largest=[];
-  for(let start=0;start<w*h;start++){
-   if(seen[start]||data[start*4+3]<32)continue;let head=0,tail=1;queue[0]=start;seen[start]=1;
-   const add=j=>{if(j>=0&&j<w*h&&!seen[j]&&data[j*4+3]>=32){seen[j]=1;queue[tail++]=j}};
-   while(head<tail){const j=queue[head++];if(j%w)add(j-1);if(j%w<w-1)add(j+1);add(j-w);add(j+w)}
-   if(tail>largest.length)largest=Array.from(queue.subarray(0,tail));
-  }
-  const keep=new Uint8Array(w*h);for(const j of largest)keep[j]=1;for(let j=0;j<w*h;j++)if(!keep[j])data[j*4+3]=0;
+  pruneCelFragments(pixels,w,h);
   t.putImageData(pixels,0,0);frames.push(c);
  }
  animationSheets.bound={frames};bindSpriteReady=true;
@@ -231,9 +232,9 @@ boundImage.onload=()=>{
 boundImage.onerror=()=>{bindSpriteReady=false;bossArtFailure()};
 boundImage.src='assets/animation/boss-bind-integrated.png';
 const unboundDrawZero=drawZeroAnimated;
-drawZeroAnimated=function(){if(!zeroBound()||!bindSpriteReady)unboundDrawZero()};
+drawZeroAnimated=function(){if(spiderBind&&drawSpiderBound())return;if(!zeroBound()||spiderBind||!bindSpriteReady)unboundDrawZero()};
 function bindingLayout(b){
- const p=bugPosition(b),size=150,left=p.x-size*.68,top=Math.max(4,p.y+12-size*.88);
+ const p=bugPosition(b),size=150*MIDBOSS_SCALE,left=p.x-size*.68,top=Math.max(4,p.y+12-size*.88);
  return {left,top,size,zero:{x:left+size*.23,y:top+size*.82}};
 }
 function drawBossBinding(){

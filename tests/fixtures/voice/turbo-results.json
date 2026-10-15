@@ -1,0 +1,46 @@
+{
+  "model": "onnx-community/whisper-large-v3-turbo",
+  "revision": "360ebcde2559d60bb474678be3c1de9ef347d01a",
+  "dtype": "q8",
+  "runtime": "native ONNX CPU, four threads",
+  "source": "Preserved verbatim evaluation outputs from 2026-10-14 before the environment reset; checkpoint branch codex/voice-upgrade-checkpoint-20261014. GPU fp16 was not measured.",
+  "synthetic": true,
+  "results": {
+    "sword": {
+      "text": "ファイル、ソード、ナンバー、1、エンター。"
+    },
+    "guns": {
+      "text": "ファイル、ガンズ、ナンバー、2、エンター。"
+    },
+    "shield": {
+      "text": "ファイルシールドナンバー3エンター"
+    },
+    "wing": {
+      "text": "ファイル、WING、No.003、Enter。"
+    },
+    "gravity": {
+      "text": "ファイル、グラビティ、ナンバー、002、エンター。"
+    },
+    "area": {
+      "text": "ファイル、エリア、ナンバー、4、エンター。"
+    },
+    "target": {
+      "text": "ターゲット、ナンバー、2、エンター。"
+    },
+    "reset": {
+      "text": "リセット"
+    },
+    "enter": {
+      "text": "エンターファー!"
+    },
+    "down": {
+      "text": "降りてエンター"
+    },
+    "auto": {
+      "text": "オートモード、エンター。"
+    },
+    "multiple": {
+      "text": "ファイル、ソード、ナンバー、2、次に、ファイル、ガンズ、ナンバー、3、それから、ファイル、ソード、ナンバー、1、3回使って、エンター。"
+    }
+  }
+}

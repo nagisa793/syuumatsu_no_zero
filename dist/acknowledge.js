@@ -10,5 +10,5 @@ function playGotcha(){
  gotchaDecode.then(buffer=>{if(!buffer||!sound||audio.currentTime-requestedAt>1)return;const source=audio.createBufferSource(),gain=audio.createGain();source.buffer=buffer;gain.gain.value=.45*sfxVolume;source.connect(gain);gain.connect(audio.destination);source.onended=()=>{source.disconnect();gain.disconnect()};source.start()});
 }
 const acknowledgedCommand=runCommand;
-runCommand=function(raw){const queued=state==='intro',ok=acknowledgedCommand(raw);if(ok&&!queued&&splitInstructions(raw).some(s=>!['family','info','empty'].includes(interpretInstruction(s).kind)))playGotcha();return ok};
+runCommand=function(raw,options={}){const queued=state==='intro',ok=acknowledgedCommand(raw,options);if(ok&&!queued&&splitInstructions(raw).some(s=>!['family','info','empty'].includes(interpretInstruction(s).kind)))playGotcha();return ok};
 window.zeroBattle={...window.zeroBattle,runCommand};

@@ -1,4 +1,10 @@
-# 終末のゼロ — v9
+# 終末のゼロ — 現行 v73
+
+現行の操作は全19技を常設したタップ式。音声入力・文字入力は廃止。TARGET中に最大5件を蓄積し、「技を使う」で先頭から1件ずつ実行する。技の配置は5行4列で右下を空け、右端の上4段がエリア。アカリの技名は同じAudioContextから事前生成の音声で再生する。現行仕様と検証は `docs/tap-controls.md`、テストは `node tests/audio.cjs` と `node tests/dialogue.cjs`。
+
+以下は過去の変更記録。
+
+## v9
 
 - Voice instructions are parsed into independent technique, target, count, duration, delay, condition, and cancellation fields. They are not complete-utterance string matches. This is a deterministic game-domain interpreter, not an unrestricted language model. Unknown conditions ask for clarification rather than being discarded.
 - `orders.js` owns instruction lifecycle: queued → transforming → ready → recover → complete. Default is one successful use. Counted/conditional repetition must be requested. Battery is deducted only on execution.

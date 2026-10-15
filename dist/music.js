@@ -1,14 +1,35 @@
 'use strict';
-let battleMusic=null,musicPlaying=false,musicSpeaking=false,musicPlayPending=false,musicFailed=false,musicPrimed=false,musicRequest=0;
+let battleMusic=null,musicPlaying=false,musicSpeaking=false,musicPlayPending=false,musicFailed=false,musicPrimed=false,musicRequest=0,musicFailures=0,musicRetryAt=0;
+let homeMusic=null,homeMusicPending=false,homeMusicRequest=0,homeMusicRetryAt=0;
+let homeStartBuffer=null,homeStartDecoding=null;
+let homeAudioWarmContext=null,homeAudioWarmAt=0;
+function loadHomeStartBytes(){return fetch('assets/music/zero-home-start-v1.wav').then(r=>r.ok?r.arrayBuffer():null).catch(()=>null)}
+let homeStartBytes=loadHomeStartBytes();
+function prepareHomeStartSound(){
+ if(homeStartBuffer)return Promise.resolve(homeStartBuffer);
+ if(!audio)return Promise.resolve(null);
+ homeStartDecoding??=homeStartBytes.then(async bytes=>{if(!bytes)bytes=await(homeStartBytes=loadHomeStartBytes());if(!bytes)throw Error('Home start sound');return audio.decodeAudioData(bytes.slice(0))}).then(buffer=>homeStartBuffer=buffer).catch(()=>{homeStartDecoding=null;return null});
+ return homeStartDecoding;
+}
+function playHomeStartSound(accept=()=>true){
+ if(!sound||!audio)return;
+ const context=audio,at=context.currentTime;
+ prepareHomeStartSound().then(buffer=>{
+  if(!buffer||context!==audio||!sound||!accept()||context.currentTime-at>.3)return;
+  const source=context.createBufferSource(),gain=context.createGain();source.buffer=buffer;gain.gain.value=sfxVolume*.7;
+  source.connect(gain);gain.connect(context.destination);source.onended=()=>{source.disconnect();gain.disconnect()};source.start();
+ });
+}
 const MUSIC_MIX=.176; // 40% of the previous BGM gain; SFX remain unchanged.
 // Share the SFX AudioContext. No HTML media-element play/pause transitions
 // during recognition, and no reliance on iOS HTMLMediaElement.volume.
 class BattleScore {
- constructor(){
+ constructor(url='assets/music/zero-debug-battle-v17.mp3'){
+  this.url=url;
   this.paused=true;this.plays=0;this.source=null;this.gain=null;this.buffer=null;this.offset=0;this.startedAt=0;this.generation=0;this._volume=musicVolume*MUSIC_MIX;this._muted=false;this.decoding=null;
   this.bytes=this.loadBytes();
  }
- loadBytes(){return fetch('assets/music/zero-debug-battle-v17.mp3').then(r=>{if(!r.ok)throw new Error('BGM download');return r.arrayBuffer()}).catch(()=>null)}
+ loadBytes(){return fetch(this.url).then(r=>{if(!r.ok)throw new Error('BGM download');return r.arrayBuffer()}).catch(()=>null)}
  get volume(){return this._volume}
  set volume(value){this._volume=Math.max(0,Math.min(1,value));this.applyGain()}
  get muted(){return this._muted}
@@ -31,10 +52,36 @@ class BattleScore {
  pause(){this.offset=this.currentTime;this.paused=true;this.generation++;this.stopSource()}
 }
 function ensureBattleMusic(){return battleMusic??=new BattleScore()}
-function playBattleMusic(){const track=ensureBattleMusic();if(musicPlayPending||musicFailed)return;const request=++musicRequest;musicPlayPending=true;musicPlaying=true;track.play().then(()=>{if(request===musicRequest)musicPlayPending=false}).catch(()=>{if(request!==musicRequest)return;musicPlayPending=false;musicPlaying=false;musicFailed=true;track.pause();msg('BGMの読み込みに失敗しました。BGMボタンで再試行できます。')})}
-function restartBattleMusic(){const track=ensureBattleMusic();musicRequest++;musicPlayPending=false;musicFailed=false;musicPrimed=false;musicPlaying=false;track.pause();track.currentTime=0;track.volume=musicVolume*MUSIC_MIX}
+function ensureHomeMusic(){return homeMusic??=new BattleScore('assets/music/zero-home-opening-v2.mp3')}
+function attemptHomeAutoplay(){
+ // Request audible playback on launch. The browser decides whether this
+ // origin may autoplay; rejection leaves gesture recovery available.
+ if(state!=='start'||document.hidden||!sound||!music||musicVolume<=0)return;
+ unlockAudio();
+ if(audio?.state==='running')syncHomeMusic();
+}
+function stopHomeMusic(){homeMusicRequest++;homeMusicPending=false;if(homeMusic&&!homeMusic.paused)homeMusic.pause()}
+function syncHomeMusic(){
+ const track=ensureHomeMusic(),active=state==='start'&&sound&&music&&!document.hidden;
+ track.volume=musicVolume*MUSIC_MIX;
+ if(!active){stopHomeMusic();return}
+ if(audio?.state==='running'&&(homeAudioWarmContext!==audio||Date.now()>=homeAudioWarmAt)){
+  homeAudioWarmContext=audio;homeAudioWarmAt=Date.now()+1500;
+  prepareHomeStartSound();
+  if(typeof prepareAkariOpeningVoice==='function')prepareAkariOpeningVoice();
+ }
+ // Boot requests playback once; a browser that blocks autoplay keeps this
+ // output suspended until a permitted interaction unlocks it.
+ if(!audio||audio.state!=='running'||homeMusicPending||!track.paused||Date.now()<homeMusicRetryAt)return;
+ const request=++homeMusicRequest;homeMusicPending=true;
+ track.play().then(()=>{if(request===homeMusicRequest)homeMusicPending=false}).catch(()=>{
+  if(request!==homeMusicRequest)return;homeMusicPending=false;homeMusicRetryAt=Date.now()+1500;track.pause();
+ });
+}
+function playBattleMusic(){const track=ensureBattleMusic();if(musicPlayPending||musicFailed)return;const request=++musicRequest;musicPlayPending=true;musicPlaying=true;track.play().then(()=>{if(request===musicRequest){musicPlayPending=false;musicFailures=0}}).catch(()=>{if(request!==musicRequest)return;musicPlayPending=false;musicPlaying=false;musicFailed=true;musicFailures++;musicRetryAt=Date.now()+Math.min(3000,musicFailures*750);track.pause();if(musicFailures>=3)msg('BGMを読み込めませんでした。戦闘を再開すると再試行します。')})}
+function restartBattleMusic(){const track=ensureBattleMusic();musicRequest++;musicPlayPending=false;musicFailed=false;musicFailures=0;musicPrimed=false;musicPlaying=false;track.pause();track.currentTime=0;track.volume=musicVolume*MUSIC_MIX}
 function primeBattleScore(){const track=ensureBattleMusic();track.muted=true;musicPrimed=true;if(sound&&music)playBattleMusic()}
-function startBattleScore(){const track=ensureBattleMusic();scoreStarted=true;musicPrimed=false;track.currentTime=0;track.muted=false;track.volume=musicVolume*MUSIC_MIX;if(sound&&music)playBattleMusic()}
-function syncBattleMusic(){const track=battleMusic;if(!track)return;const volume=musicVolume*MUSIC_MIX;if(track.volume!==volume)track.volume=volume;const active=sound&&music&&(['battle','target','lock'].includes(state)||state==='intro'&&(scoreStarted||musicPrimed));if(!active){if(musicPlaying||!track.paused){track.pause();musicRequest++;musicPlayPending=false;musicPlaying=false}return}if(!musicPlaying&&!musicPlayPending&&!musicFailed)playBattleMusic()}
-$('music').onclick=()=>{music=!music;$('music').textContent=music?'BGM ON':'BGM OFF';musicFailed=false;unlockAudio();syncBattleMusic()};
+function startBattleScore(){unlockAudio();const track=ensureBattleMusic();scoreStarted=true;musicPrimed=false;track.currentTime=0;track.muted=false;track.volume=musicVolume*MUSIC_MIX;if(sound&&music)playBattleMusic()}
+function syncBattleMusic(){syncHomeMusic();const track=battleMusic;if(!track)return;const volume=musicVolume*MUSIC_MIX;if(track.volume!==volume)track.volume=volume;const active=sound&&music&&(['battle','target','lock'].includes(state)||state==='intro'&&(scoreStarted||musicPrimed));if(!active){if(musicPlaying||!track.paused){track.pause();musicRequest++;musicPlayPending=false;musicPlaying=false}return}if(audio?.state!=='running')unlockAudio();if(musicFailed&&musicFailures<3&&Date.now()>=musicRetryAt)musicFailed=false;if(musicPlaying&&!musicPlayPending&&track.paused)musicPlaying=false;if(!musicPlaying&&!musicPlayPending&&!musicFailed)playBattleMusic()}
 ensureBattleMusic();
+ensureHomeMusic();

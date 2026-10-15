@@ -1,0 +1,1 @@
+Japanese command readings derive from kuromoji.js 0.1.2 and mecab-ipadic. See APACHE-2.0.txt and IPADIC-NOTICE.md. The game uses the browser speech recognition service; it does not bundle or download a recognition model.

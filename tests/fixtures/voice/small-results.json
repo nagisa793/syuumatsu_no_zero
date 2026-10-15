@@ -1,0 +1,88 @@
+{
+  "model": "onnx-community/whisper-small",
+  "revision": "36050c46d777d46dc4b5f43f6d90574fc38f8732",
+  "dtype": "q8",
+  "runtime": "native ONNX CPU, four threads",
+  "synthetic": true,
+  "created": "2026-10-14T08:27:47.075Z",
+  "results": {
+    "sword": {
+      "reference": "ファイル、ソード、ナンバー、一、エンター",
+      "seconds": 4.615,
+      "text": "入る、ソード、ナンバー、1、エンターハン",
+      "milliseconds": 1885.891801
+    },
+    "guns": {
+      "reference": "ファイル、ガンズ、ナンバー、二、エンター",
+      "seconds": 4.405,
+      "text": "ファイル ガンズ ナンバー2エンターハー",
+      "milliseconds": 1745.3210749999998
+    },
+    "shield": {
+      "reference": "ファイル、シールド、ナンバー、三、エンター",
+      "seconds": 4.725,
+      "text": "ファイル シールド ナンバー 3 エンターバー",
+      "milliseconds": 1653.2336049999994
+    },
+    "wing": {
+      "reference": "ファイル、ウィング、ナンバー、ゼロ、ゼロ、スリー、エンター",
+      "seconds": 6.28,
+      "text": "入る、Ming、Number、0、0、3、Enter",
+      "milliseconds": 1492.209739
+    },
+    "gravity": {
+      "reference": "ファイル、グラビティ、ナンバー、ゼロゼロ二、エンター",
+      "seconds": 5.105,
+      "text": "入る、プラビティ、ナンバー、002、エンターハー",
+      "milliseconds": 1586.174638999999
+    },
+    "area": {
+      "reference": "ファイル、エリア、ナンバー、四、エンター",
+      "seconds": 4.4,
+      "text": "ファイルエリアナンバー4エンターハー",
+      "milliseconds": 1485.1626309999992
+    },
+    "target": {
+      "reference": "ターゲット、ナンバー、ツー、エンター",
+      "seconds": 3.915,
+      "text": "ターゲット ナンバー2 エンター",
+      "milliseconds": 1254.733053
+    },
+    "reset": {
+      "reference": "リセット",
+      "seconds": 1.22,
+      "text": "リセット",
+      "milliseconds": 1123.897923999999
+    },
+    "enter": {
+      "reference": "エンター",
+      "seconds": 1.135,
+      "text": "エンター",
+      "milliseconds": 1151.5450369999999
+    },
+    "down": {
+      "reference": "降りて、エンター",
+      "seconds": 1.895,
+      "text": "降りて、エンターハイ!",
+      "milliseconds": 1276.1621080000004
+    },
+    "auto": {
+      "reference": "オートモード、エンター",
+      "seconds": 2.24,
+      "text": "オートモード エンターハー",
+      "milliseconds": 1193.8074149999993
+    },
+    "multiple": {
+      "reference": "ファイル、ソード、ナンバー、二、次に、ファイル、ガンズ、ナンバー、三、それから、ファイル、ソード、ナンバー、一、三回使って、エンター",
+      "seconds": 15.2,
+      "text": "ファイル、ソード、ナンバー、2、次に、ファイル、ガンズ、ナンバー、3、それから、ファイル、ソード、ナンバー、1、3回使って、エンター。",
+      "milliseconds": 2585.300006999998
+    },
+    "mixed-digits": {
+      "reference": "ファイル、ガンズ、ナンバー、ゼロゼロツー、エンター",
+      "seconds": 5.16,
+      "text": "入る。ガンズ。ナンバー。002。エンター。",
+      "milliseconds": 1516.665743999998
+    }
+  }
+}

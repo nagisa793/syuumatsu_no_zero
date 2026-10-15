@@ -1,0 +1,39 @@
+{
+  "results": [
+    {
+      "label": "command",
+      "maxProbability": 0.9999696016311646,
+      "samples": 70144,
+      "seconds": 4.405,
+      "runtime": "shipped WASM in Node"
+    },
+    {
+      "label": "quiet-command",
+      "maxProbability": 0.9979490041732788,
+      "samples": 70144,
+      "seconds": 4.405,
+      "runtime": "shipped WASM in Node"
+    },
+    {
+      "label": "bgm",
+      "maxProbability": 0.3359794020652771,
+      "samples": 320000,
+      "seconds": 20,
+      "runtime": "shipped WASM in Node"
+    },
+    {
+      "label": "bgm-original",
+      "maxProbability": 0.023327350616455078,
+      "samples": 320000,
+      "seconds": 20,
+      "runtime": "shipped WASM in Node"
+    },
+    {
+      "label": "human",
+      "maxProbability": 0.9999986886978149,
+      "samples": 74752,
+      "seconds": 4.7,
+      "runtime": "shipped WASM in Node"
+    }
+  ]
+}
