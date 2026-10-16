@@ -53,6 +53,14 @@ function captureOpening(name){
  run('draw()');if(!process.env.ZERO_RENDER_OUT)return;
  const image=adapt(createCanvas(960,540));image.getContext('2d').drawImage(els.game,0,0);openingFrames.push({name,image});
 }
+function assertDebugSecond(renderer,start){
+ const paint=run('ctx'),original=paint.fillText.bind(paint),age=run('introAge');let visible=0,shown=false;
+ paint.fillText=function(label,...args){if(label==='DEBUG'){shown=true;assert.equal(paint.globalAlpha,1,'DEBUG must remain fully legible')}return original(label,...args)};
+ try{
+  for(let frame=-1;frame<=60;frame++){shown=false;run('introAge='+(start+(frame+.5)/60)+';'+renderer+'()');if(shown)visible++}
+  assert.equal(visible,60,'DEBUG must be drawn for exactly one second at 60 fps');
+ }finally{paint.fillText=original;run('introAge='+age)}
+}
 (async()=>{
  assert(els.begin.disabled);assert(Number(els.zeroload.getAttribute('aria-valuenow'))<100);
  const skySeed=seed,skyStart=run('time');run('drawHomeScreen()');
@@ -82,8 +90,8 @@ function captureOpening(name){
   paint.scale(2,2);run('drawHomeBackdrop')(paint);fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'home-art-native.png'),art.toBuffer('image/png'));
   for(const t of [0,2,4,6]){run('drawHomeBackdrop')(paint,t);fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'home-'+t+'.png'),art.toBuffer('image/png'))}
   // Artwork/layout inspection only, not a browser or DOM screenshot.
-  run('drawHomeBackdrop')(paint,0);const star=await loadImage(root+'assets/home/start-star-v83.svg'),w=480*.18;
-  paint.drawImage(star,480*.65-w/2,270*.46-w/2,w,w);
+  run('drawHomeBackdrop')(paint,0);const star=await loadImage(root+'assets/home/start-star-v83.svg'),w=480*.26;
+  paint.drawImage(star,480*.65-w/2,270*.39-w/2,w,w);
   fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'home-button-shape.png'),art.toBuffer('image/png'));
  }
  const filmFrames=[];
@@ -139,7 +147,7 @@ function captureOpening(name){
  assert.equal(run('opening.phase'),'home');assert(run('prologueScore.paused&&!prologueScore.source&&prologueEffects.paused&&!prologueEffects.source'),'a delayed film decode cannot play after skipping');assert(run('homeMusic.source.started'));
  console.log('PASS TOUCH, separate ground paths and perspective, flying midboss, silent front-view Akari, pure black Zero with no lingering wings, smooth white/home dissolve, frozen battle/RNG and immediate skip in every phase.');
  const homeSource=fs.readFileSync(root+'intro.js','utf8'),homeHTML=fs.readFileSync(root+'index.html','utf8');
- const phone=run('homePhoneBounds()');assert.equal(phone.height,158);assert.equal(phone.angle,Math.PI/6);
+ const phone=run('homePhoneBounds()');assert.equal(phone.height,178);assert.equal(phone.angle,Math.PI/6);
  const halfW=(phone.width*Math.cos(phone.angle)+phone.height*Math.sin(phone.angle))/2,halfH=(phone.width*Math.sin(phone.angle)+phone.height*Math.cos(phone.angle))/2;
  assert(phone.x-halfW>=0&&phone.x+halfW<=480&&phone.y-halfH>=0&&phone.y+halfH<=270,'the larger iPhone must fit the home viewport');
  assert(homeSource.includes('target.drawImage(homeArtwork,-15,5,W,H)'));
@@ -159,7 +167,9 @@ function captureOpening(name){
  run('advance('+(timing.arrival+.03-run('introAge'))+')');assert.equal(run('zeroArrivalProgress()'),1);assert.equal(run('state'),'intro');captureOpening('ARRIVAL');
  assert.equal(run('col'),1);assert.equal(run('row'),1);assert.equal(run('layer'),0);assert.equal(run('hp'),200);assert.equal(run('elapsed'),0);assert.equal(run('JSON.stringify(bugs.map(b=>[b.c,b.r,b.hp]))'),initialEnemies);
  run('advance('+(timing.debug+.18-run('introAge'))+')');assert(run('introDebug'));captureOpening('DEBUG');
+ assertDebugSecond('presentHomeIntro',timing.debug);
  run('advance('+(timing.end+.1-run('introAge'))+')');assert.equal(run('state'),'target');assert.equal(run('homeIntro'),null);captureOpening('TARGET');
+ run('state="intro"');assertDebugSecond('presentBattleFrame',.94);run('state="target"');
  if(process.env.ZERO_RENDER_OUT){
   fs.mkdirSync(process.env.ZERO_RENDER_OUT,{recursive:true});const sheet=createCanvas(960*2,574*Math.ceil(openingFrames.length/2)),out=sheet.getContext('2d');out.fillStyle='#06111d';out.fillRect(0,0,sheet.width,sheet.height);out.font='bold 20px monospace';
   for(const [i,f] of openingFrames.entries()){const x=i%2*960,y=Math.floor(i/2)*574;out.fillStyle='#baffeb';out.fillText(f.name,x+16,y+25);out.drawImage(f.image,x,y+34)}

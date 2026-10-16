@@ -146,3 +146,9 @@ Create custom Japanese game-title lettering, not plain typesetting. The letterin
 Integrate the game's ZERO emblem into the logo as one cohesive designed object: a large tilted oval zero with a clean diagonal slash, behind the right half of the lettering, metallic silver/cyan with a small amber highlight. A few angular circuit terminals may attach to the silhouette, but no extra symbols floating in unused space. The logo's graphic silhouette is compact, clean and balanced. Preserve legibility at a displayed width of 300 pixels. Use authored crisp pixel-edge detail, controlled 16-bit color ramps and stepped highlights; premium GBA title-logo craftsmanship. No soft blur, no painterly glow fog, no generic plain font appearance, no excessive little decorations.
 Canvas: wide horizontal transparent image with fully visible logo and modest clear padding. Genuinely transparent background and counters between letters. NO backdrop, no people, no game mockup, no buttons. This is only the final reusable logo asset.
 ```
+
+## STARTの視認性とDEBUG（v90）
+
+STARTの六芒星はバトル枠の横幅18%から26%へ拡大（約1.44倍）。中央の横位置は維持し、縦位置を46%から39%へ移して作品ロゴとの間を保つ。iPhoneは高さ158から178へ拡大し、中心を390・103に調整。正面から見た端末を30度傾けた構図と、ホーム10個・Dock4個のアプリは維持する。
+
+DEBUGはホームからの初戦と通常の戦闘導入の双方で、透明度を落とさず1秒表示する。初戦はその1秒が終わってからTARGETに移る。実際の描画関数を60fpsでサンプリングし、前後の非表示と60フレームの表示を確認する。

@@ -1,5 +1,6 @@
 'use strict';
 let introAge=0,introCommands=[],introDebug=false,scoreStarted=false,homeIntro=null;
+const DEBUG_DISPLAY_SECONDS=1;
 const homeArtwork=new Image(),homeCircuitArt=new Image(),homeTitleArt=new Image(),homePhoneArt=new Image();
 for(const image of [homeArtwork,homeCircuitArt,homeTitleArt,homePhoneArt]){image.onload=()=>assetReady(false);image.onerror=assetError}
 homeArtwork.src='assets/home/title-akari-v81.webp';
@@ -14,7 +15,7 @@ const homeReducedMotion=!!window.matchMedia?.('(prefers-reduced-motion: reduce)'
 function homeIntroActive(){return !!homeIntro&&(state==='intro'||state==='paused'&&beforePause==='intro')}
 function homeIntroTiming(){
  const signal=ENCODE_SIGNAL_DURATION;
- return {signal,departure:signal+.18,reveal:signal+.95,arrival:signal+3.00,debug:signal+3.55,end:signal+4.20};
+ return {signal,departure:signal+.18,reveal:signal+.95,arrival:signal+3.00,debug:signal+3.55,end:signal+3.55+DEBUG_DISPLAY_SECONDS};
 }
 function beginBattleIntro(){homeIntro=null;introAge=0;introCommands=[];introDebug=false;scoreStarted=false;state='intro';primeBattleScore();msg('');commandFeedback('接続中')}
 function beginHomeIntro(){
@@ -132,8 +133,8 @@ function drawHomeTitle(target,clock){
  target.drawImage(homeLogoSurface,p.x,p.y,p.width,p.height);
 }
 function homePhoneBounds(){
- const height=158;
- return {x:398,y:93,width:height*homePhoneArt.naturalWidth/homePhoneArt.naturalHeight,height,angle:Math.PI/6};
+ const height=178;
+ return {x:390,y:103,width:height*homePhoneArt.naturalWidth/homePhoneArt.naturalHeight,height,angle:Math.PI/6};
 }
 function drawHomeBackdrop(target,clock=homeSkyClock()){
  drawHomeSpace(target,clock);
@@ -166,7 +167,7 @@ function presentHomeIntro(){
  }else{
   const reveal=Math.min(1,(a-t.reveal)/.24);ctx.drawImage(buffer,0,0,W,H);
   if(reveal<1){ctx.fillStyle=`rgba(2,8,16,${1-reveal})`;ctx.fillRect(0,0,W,H)}
-  if(a>=t.debug){const opacity=Math.min(1,(a-t.debug)/.09,(t.end-a)/.16);ctx.save();ctx.globalAlpha=Math.max(0,opacity);ctx.fillStyle='#061218d9';ctx.fillRect(0,96,W,42);ctx.textAlign='center';ctx.font='900 28px monospace';ctx.fillStyle='#baffeb';ctx.fillText('DEBUG',W/2,127);ctx.fillRect(184,134,112,1);ctx.restore()}
+  if(a>=t.debug&&a<t.debug+DEBUG_DISPLAY_SECONDS){ctx.save();ctx.globalAlpha=1;ctx.fillStyle='#061218d9';ctx.fillRect(0,96,W,42);ctx.textAlign='center';ctx.font='900 28px monospace';ctx.fillStyle='#baffeb';ctx.fillText('DEBUG',W/2,127);ctx.fillRect(184,134,112,1);ctx.restore()}
  }
  ctx.restore();
 }
@@ -177,5 +178,5 @@ function presentBattleFrame(){
  const power=Math.max(0,1-t/.95);ctx.save();ctx.globalAlpha=Math.min(1,(t-.12)/.56);
  for(let y=0;y<H;y+=3){const dx=Math.round((Math.sin(y*.14+t*42)*21+Math.sin(y*.4-t*90)*7)*power);ctx.drawImage(buffer,0,y,W,3,dx*sx,y*sy,W*sx,3*sy)}ctx.restore();
  if(t<.95){ctx.fillStyle='#b9ffe5';for(let n=0;n<30;n++){ctx.globalAlpha=(.04+n%4*.04)*power;ctx.fillRect(((n*73+Math.floor(t*110)*17)%W)*sx,((n*47+Math.floor(t*120)*13)%H)*sy,(3+n%9)*sx,sy)}ctx.globalAlpha=1}
- if(t>=.94&&t<1.96){ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,(t-.94)/.12,(1.96-t)/.18));ctx.fillStyle='#061218d9';ctx.fillRect(0,111*sy,canvas.width,46*sy);ctx.textAlign='center';ctx.font='900 '+Math.round(32*sy)+'px monospace';ctx.fillStyle='#90ffe4';ctx.fillText('DEBUG',canvas.width/2,145*sy);ctx.fillStyle='#c6ffee';ctx.fillRect(174*sx,153*sy,132*sx,sy);ctx.restore()}
+ if(t>=.94&&t<.94+DEBUG_DISPLAY_SECONDS){ctx.save();ctx.globalAlpha=1;ctx.fillStyle='#061218d9';ctx.fillRect(0,111*sy,canvas.width,46*sy);ctx.textAlign='center';ctx.font='900 '+Math.round(32*sy)+'px monospace';ctx.fillStyle='#90ffe4';ctx.fillText('DEBUG',canvas.width/2,145*sy);ctx.fillStyle='#c6ffee';ctx.fillRect(174*sx,153*sy,132*sx,sy);ctx.restore()}
 }
