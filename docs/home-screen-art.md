@@ -12,7 +12,7 @@
 - ロゴは10px下へ移動した配置を維持。真正面のiPhoneを従来の約1.3倍（高さ122→158px）に拡大し、時計回りの傾きを45°から30°へ緩める。右上の背景とアカリの間に配置。
 - iPhoneの上部に10個のアプリアイコン（4＋4＋2）を追加。下部の4個はそのまま。合計14個であり、追加10個にドック4個を含めない。
 - 六芒星の開始ボタンは「の」の上へ配置（中心は画面幅65%・高さ46%）。表示は「START」。文字は角ばった斜体・ステンシル風の専用SVGパスで描き、標準フォントや外部フォントには依存しない。
-- 開始ボイスは実音声を「エンコードゼロ！」とひと続きに再合成。専用開始SE、転送、DEBUG、TARGETまで既存の演出につなぐ。
+- 開始時は転送用の電子音SEを鳴らす。専用開始SE、転送、DEBUG、TARGETまで既存の演出につなぐ。
 - ホーム曲は164BPM・64小節・約93.66秒のアップテンポな循環ループへ更新。冒頭から主旋律・4拍キック・細かいアルペジオを入れ、長い静かな導入は設けない。平均音量の基準は0.16 RMSを維持し、戦闘BGMは変更しない。初回再生はブラウザの自動再生制限に従い最初のタップ後。音量スライダーは共通、開始時はホーム曲を止めて掛け声へ切り替える。
 
 ## 配信素材
@@ -26,11 +26,10 @@
 | 六芒星STARTボタン | [start-star-v83.svg](sandbox:/workspace/scratch/769286318d85/site-source/dist/assets/home/start-star-v83.svg) |
 | アップテンポのホーム曲 | [zero-home-opening-v2.mp3](sandbox:/workspace/scratch/769286318d85/site-source/dist/assets/music/zero-home-opening-v2.mp3) |
 | 開始SE | [zero-home-start-v1.wav](sandbox:/workspace/scratch/769286318d85/site-source/dist/assets/music/zero-home-start-v1.wav) |
-| 新しい開始ボイス | [encode-zero-v2.wav](sandbox:/workspace/scratch/769286318d85/site-source/dist/assets/akari/encode-zero-v2.wav) |
 
 iPhoneの外観は[Apple公式の現行製品ページ](https://www.apple.com/jp/iphone-18-pro/)および[正面写真](https://www.apple.com/jp/iphone-18-pro/images/overview/product-viewer/size__ufk3tqa1f5e2_large.jpg)を2026年10月15日に確認。SF端末にはしない。電話画像は組み込み画像編集機能で制作し、最新版の原本を `scripts/art-source/title-iphone-v83.png` に保存。配信時のWebPは255×512、153,848バイト。`scripts/package-home-phone.py` は透明な余白の除去とサイズ・形式変換だけを行う。
 
-ホーム曲と専用SEは `scripts/compose-home-opening.py` で事前生成。音源モデルのダウンロード・端末上での合成・外部有料サービスは使用しない。新ボイスは既存のVOICEVOX音源で事前生成する。
+ホーム曲と専用SEは `scripts/compose-home-opening.py` で事前生成。音源モデルのダウンロード・端末上での合成・外部有料サービスは使用しない。アカリのボイスとその読み込みは廃止し、転送用SEは即時に鳴らす。
 
 原本PNGは `scripts/art-source/title-akari-v81.png`、`title-circuit-v81.png`、`title-logo-v81.png` に保存。人物とロゴのWebPは可逆圧縮。背景のみ品質96で圧縮し、960×540で配信。読み込みモデルや外部実行サービスは追加しない。
 
@@ -38,7 +37,7 @@ iPhoneの外観は[Apple公式の現行製品ページ](https://www.apple.com/jp
 
 ## 検証
 
-- 実ゲームの開始、遅延読み込み、開始ボイス、転送、DEBUG、TARGETをテスト。
+- 実ゲームの開始、遅延読み込み、開始SE、転送、DEBUG、TARGETをテスト。
 - 19種類の技、5件のストック、待機技の実行とキャンセル、回数制限、着地、ボス戦、設定の停止・再開をテスト。
 - 背景の広範囲が動くこと、180秒分の移動でも右上方向が変わらず四辺が欠けないこと、設定で停止すること、戦闘乱数を消費しないことをテスト。
 - ホーム曲のタップ後再生、設定の停止・復帰、音量、専用SE、開始前の停止と遅延デコード時の重複防止を音声出力のテストで確認する。

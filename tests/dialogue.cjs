@@ -1,6 +1,6 @@
 const {createCanvas,loadImage}=require('@napi-rs/canvas');
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const root=path.resolve(__dirname,'../dist')+'/',els={},pending=[],timers=new Map(),recognizers=[],frames=[];
+const root=path.resolve(__dirname,'../dist')+'/',els={},pending=[],timers=new Map(),recognizers=[],frames=[],fetches=[];
 let timerId=0,seed=917,clock=0;
 function waitVoice(ms){const end=clock+ms;while(true){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;clock=next[1].at;timers.delete(next[0]);next[1].fn()}clock=end}
 const math=Object.create(Math);math.random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);const randomizedMovement=math.random;
@@ -17,14 +17,14 @@ class AudioContext{
  constructor(){this.currentTime=0;this.sampleRate=8000;this.state='running';this.destination={};this.sources=[]}
  resume(){if(this.blockedResume)return new Promise(()=>{});this.state='running';return Promise.resolve()}
  createGain(){const gain={value:1,setValueAtTime(v){this.value=v},linearRampToValueAtTime(v){this.value=v},exponentialRampToValueAtTime(v){this.value=v}};return{gain,connect(){},disconnect(){}}}
- createOscillator(){return{frequency:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){},start(){},stop(){}}}
+ createOscillator(){const s={context:this,frequency:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){},start(t){this.started=true;this.at=t},stop(t){if(t===undefined||t<=this.context.currentTime)this.stopped=true;else this.stopAt=t}};this.sources.push(s);return s}
  createBiquadFilter(){return{frequency:{value:1000,setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}}}
  createBuffer(channels,n){return{getChannelData:()=>new Float32Array(n)}}
  createBufferSource(){const s={connect(){},disconnect(){},start(t,offset){this.offset=offset;this.started=true},stop(){this.stopped=true}};this.sources.push(s);return s}
  decodeAudioData(){if(this.decodeFailures){this.decodeFailures--;return Promise.reject(Error('temporary decode failure'))}return Promise.resolve({duration:122.091})}
 }
 class SpeechRecognition{set onresult(fn){this.resultHandler=fn}get onresult(){return this.resultHandler?(e)=>{this.resultHandler(e);waitVoice(0)}:null}constructor(){throw Error('No browser recognition allowed')}start(){this.started=true;this.onstart?.()}abort(){this.aborted=true;this.onend?.()}result(text,index=0,final=true){this.results[index]={0:{transcript:text},isFinal:final,length:1};this.onresult?.({resultIndex:index,results:this.results})}}
-const listeners={},context={console,Image,Audio,Math:math,Set,Uint8Array,Int32Array,Date,navigator:{mediaDevices:{getUserMedia(){throw Error('No site microphone capture allowed')}}},fetch:async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)}),setTimeout:(fn,ms=0)=>{const id=++timerId;timers.set(id,{fn,at:clock+ms});return id},clearTimeout:id=>timers.delete(id),requestAnimationFrame(fn){frames.push(fn)},localStorage:{getItem(){return null},setItem(){}},window:{AudioContext,SpeechRecognition,addEventListener:(n,fn)=>listeners[n]=fn},document:{documentElement:element('html'),body:element('body'),hidden:false,getElementById:id=>els[id]||null,createElement:t=>t==='canvas'?adapt(createCanvas(1,1)):element('created'),querySelectorAll:()=>[],addEventListener:(n,fn)=>listeners[n]=fn}};
+const listeners={},context={console,Image,Audio,Math:math,Set,Uint8Array,Int32Array,Date,navigator:{mediaDevices:{getUserMedia(){throw Error('No site microphone capture allowed')}}},fetch:async url=>{fetches.push(url);return{ok:true,arrayBuffer:async()=>new ArrayBuffer(8)}},setTimeout:(fn,ms=0)=>{const id=++timerId;timers.set(id,{fn,at:clock+ms});return id},clearTimeout:id=>timers.delete(id),requestAnimationFrame(fn){frames.push(fn)},localStorage:{getItem(){return null},setItem(){}},window:{AudioContext,SpeechRecognition,addEventListener:(n,fn)=>listeners[n]=fn},document:{documentElement:element('html'),body:element('body'),hidden:false,getElementById:id=>els[id]||null,createElement:t=>t==='canvas'?adapt(createCanvas(1,1)):element('created'),querySelectorAll:()=>[],addEventListener:(n,fn)=>listeners[n]=fn}};
 vm.createContext(context);
 for(const file of [...fs.readFileSync(root+'index.html','utf8').matchAll(/<script src="([^"?]+)\?v=\d+"><\/script>/g)].map(m=>m[1])){
  vm.runInContext(fs.readFileSync(root+file,'utf8'),context,{filename:file});
@@ -97,7 +97,7 @@ function captureOpening(name){
   assert.equal(run('opening.phase'),'film');
   if(at<run('prologueTiming.home'))assert(run('homeMusic.paused'),'the title loop must not leak into the film');
   else assert(run('homeMusic.source.started&&!homeMusic.paused'),'the home theme begins with the white-to-home dissolve');
-  assert.equal(run('akariVoiceSources.size'),0,'the film must not play the Long Sword voice');
+  assert.equal(run('commandSoundSources.size'),0,'the film must not play the Long Sword voice');
  }
  const fadingHomeSource=run('homeMusic.source');
  assert.equal(seed,initialSeed,'film effects must never consume the battle RNG');assert.equal(run('hp'),200);assert.equal(run('energy'),100);assert.equal(run('elapsed'),0);
@@ -147,8 +147,8 @@ function captureOpening(name){
  assert(homeHTML.includes('aria-label="START"><span class="start-star-label" aria-hidden="true">START'));
  const startGraphic=fs.readFileSync(root+'assets/home/start-star-v83.svg','utf8');assert(startGraphic.includes('id="start-lettering"'));assert(!startGraphic.includes('<text'));
  const title=run('homeTitleBounds()');assert(Math.abs(480*.65-(title.x+title.width*.5))<3,'START is horizontally above the の in the title');
- els.begin.onclick();assert.equal(run('state'),'intro');assert(run('homeIntroActive()'));await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();
- const openingSource=Array.from(run('akariVoiceSources'))[0];assert.equal(openingSource.akariCueName,'エンコードゼロ！');
+ els.begin.onclick();assert.equal(run('state'),'intro');assert(run('homeIntroActive()'));await run('prepareHomeStartSound()');for(let i=0;i<10;i++)await Promise.resolve();
+ const openingSource=Array.from(run('commandSoundSources'))[0];assert(openingSource.started&&openingSource.commandGain);assert.equal(openingSource.commandOffset,0);
  const timing=run('homeIntroTiming()'),initialEnemies=run('JSON.stringify(bugs.map(b=>[b.c,b.r,b.hp]))');
  run('advance(.6)');assert.equal(run('zeroArrivalProgress()'),0);captureOpening('ENCODE');
  els.begin.onclick();assert.equal(run('introAge'),.6,'a duplicated start tap cannot reset or skip the launch');
@@ -166,7 +166,7 @@ function captureOpening(name){
   fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'opening-contact-sheet.png'),sheet.toBuffer('image/png'));
  }
  assert(!els.begin.disabled);assert.equal(els.loadfill.style.width,'100%');assert.equal(els.zeroload.getAttribute('aria-valuenow'),'100');assert(els.zeroload.classList.contains('is-ready'));assert.equal(els.loadstate.textContent,'');
- await run('battleMusic.ready()');await run('prepareAkariVoice()');for(let i=0;i<10;i++)await Promise.resolve();
+ await run('battleMusic.ready()');for(let i=0;i<10;i++)await Promise.resolve();
  assert(run('audio.state==="running"&&!battleMusic.paused&&!battleMusic.muted&&battleMusic.source.started'));
  assert.equal(recognizers.length,0);assert.equal(Object.keys(els).filter(id=>id.startsWith('tech-')).length,19);
  assert(!('command' in els));assert(!('confirm' in els));assert(!('commandform' in els));
@@ -175,17 +175,17 @@ function captureOpening(name){
  assert(context.window.zeroBattle.tapTarget(run('bugs[0].id')));run('advance(.8)');assert.equal(run('state'),'battle');assert(!tap('guns-1'));
  console.log('PASS cold start, nineteen visible skills, touch targeting, BGM and no input capture.');
 
- fresh();run('beginBattleIntro();beginHomeIntro()');await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();run('advance(.4)');
- const voiceBeforePause=Array.from(run('akariVoiceSources'))[0],introBeforePause=run('introAge');els.settings.onclick();assert(voiceBeforePause.stopped);run('advance(2)');assert.equal(run('introAge'),introBeforePause);
- els.settingsresume.onclick();for(let i=0;i<10;i++)await Promise.resolve();const resumedOpening=Array.from(run('akariVoiceSources'))[0];assert.equal(resumedOpening.akariCueName,'エンコードゼロ！');assert(Math.abs(resumedOpening.offset-introBeforePause)<1e-8);run('advance(7)');assert.equal(run('state'),'target');
- fresh();run('beginBattleIntro();beginHomeIntro();homeIntro.ready=false;advance(7)');assert.equal(run('state'),'target','an unresolved voice decode must never hold the opening forever');for(let i=0;i<10;i++)await Promise.resolve();assert.equal(run('akariVoiceSources.size'),0,'a late voice must not play over TARGET');
- console.log('PASS spoken launch, ordered teleport/reveal/DEBUG/TARGET, frozen actors, duplicate-tap protection, pause/resume voice offset and delayed-audio fallback.');
+ fresh();run('beginBattleIntro();beginHomeIntro();advance(.4)');
+ const soundBeforePause=Array.from(run('commandSoundSources'))[0],introBeforePause=run('introAge');els.settings.onclick();assert(soundBeforePause.stopped);run('advance(2)');assert.equal(run('introAge'),introBeforePause);
+ els.settingsresume.onclick();const resumedOpening=Array.from(run('commandSoundSources'))[0];assert(Math.abs(resumedOpening.commandOffset-introBeforePause)<1e-8);run('advance(7)');assert.equal(run('state'),'target');
+ fresh();run('homeStartBuffer=null;homeStartDecoding=null;homeStartBytes=new Promise(resolve=>globalThis.releaseStartBytes=resolve);beginBattleIntro();beginHomeIntro();advance(7)');assert.equal(run('state'),'target','a delayed button SE must not block the transfer');run('releaseStartBytes(new ArrayBuffer(8))');for(let i=0;i<10;i++)await Promise.resolve();assert.equal(run('commandSoundSources.size'),0);
+ console.log('PASS SE launch, ordered teleport/reveal/DEBUG/TARGET, frozen actors, duplicate-tap protection, pause/resume signal offset and delayed-audio fallback.');
 
- fresh();run('beginHomeIntro()');await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();
- run('audio.blockedResume=true;audio.state="suspended";advance(.8)');assert.equal(run('introAge'),0,'the launch animation must not consume a voice scheduled on suspended audio');
+ fresh();run('beginHomeIntro()');
+ run('audio.blockedResume=true;audio.state="suspended";advance(.8)');assert.equal(run('introAge'),0,'the launch animation must not consume an SE scheduled on suspended audio');
  run('audio.blockedResume=false;audio.state="running";advance(.3)');assert(Math.abs(run('introAge')-.3)<1e-8);run('advance(7)');assert.equal(run('state'),'target');
  fresh();run('beginHomeIntro();audio.blockedResume=true;audio.state="suspended";advance(8)');assert.equal(run('state'),'target','an unavailable output must not trap the player forever');run('audio.blockedResume=false;audio.state="running"');
- console.log('PASS delayed output activation preserves the opening voice/animation clock, with a bounded fallback when output stays unavailable.');
+ console.log('PASS delayed output activation preserves the opening SE/animation clock, with a bounded fallback when output stays unavailable.');
 
  // In-world targeting prioritizes the bug and its number. HP appears only in
  // the external target buttons, including during the selected lock flash.
@@ -240,7 +240,7 @@ function captureOpening(name){
  fresh();run('beginPhaseTransition("boss",bugs[0])');els.settings.onclick();const frozenPhase=run('phaseTransition.age');run('advance(3)');assert.equal(run('phaseTransition.age'),frozenPhase);els.settingsresume.onclick();run('advance(.2)');assert(run('phaseTransition.age')>frozenPhase);
  fresh();run('state="start";loadedCoreAssets=0;startReady=false;startRequested=true');els.settings.onclick();run('loadedCoreAssets=2;syncLoadingGauge();startWhenReady()');assert.equal(run('state'),'paused');els.settingsresume.onclick();assert.equal(run('state'),'intro','a start request becoming ready inside settings must launch after resuming');
  const menuHtml=fs.readFileSync(root+'index.html','utf8');assert(!/id="(?:sound|music)"/.test(menuHtml));assert(menuHtml.indexOf('id="settings"')>menuHtml.indexOf('id="pause"'));
- assert(menuHtml.indexOf('id="settingspanel"')<menuHtml.indexOf('<summary>ゲームの遊び方</summary>'));assert(menuHtml.indexOf('id="settingsresume"')>menuHtml.indexOf('<summary>音声素材</summary>'));
+ assert(menuHtml.indexOf('id="settingspanel"')<menuHtml.indexOf('<summary>ゲームの遊び方</summary>'));assert(menuHtml.indexOf('id="settingsresume"')>menuHtml.indexOf('<summary>ファイル図鑑'));
  console.log('PASS gear pauses and restores all battle states without draining timers or stock; pause/resume, menu switching, Escape, restart and removed sound toggles.');
 
  fresh();run('automationEnabled=true;beginTarget()');
@@ -389,11 +389,13 @@ function captureOpening(name){
  console.log('PASS ERROR phase-change capture effects animate during the pause, and automatic Wing still executes exactly once.');
 
  const expected={ 'shield-1':'シールド','shield-2':'ヘビーシールド','shield-3':'リフレクター','guns-1':'キャノン','guns-2':'ヘビーキャノン','guns-3':'スピアキャノン','gravity-3':'自由の女神' };
- for(const [id,name] of Object.entries(expected)){assert.equal(run('tapCards.find(c=>c.id==='+JSON.stringify(id)+').name'),name);assert.equal(run('akariCues['+JSON.stringify(id)+'].name'),name)}
+ for(const [id,name] of Object.entries(expected)){assert.equal(run('tapCards.find(c=>c.id==='+JSON.stringify(id)+').name'),name)}
  fresh();run('energy=0;beginTarget();updateHud()');assert(els['tech-guns-1'].disabled);assert(!tap('guns-1'));
  assert.equal(run('files.sword[2].range'),2);assert.equal(run('files.shield[2].duration'),3);
  const html=fs.readFileSync(root+'index.html','utf8');assert(!/type="text"|id="command"|id="confirm"/.test(html));assert(!html.includes('dialogue.js'));assert(!html.includes('acknowledge.js'));
  for(const script of [...html.matchAll(/<script src="([^"?]+)/g)].map(m=>m[1]))assert(!/getUserMedia|SpeechRecognition|speechSynthesis/.test(fs.readFileSync(root+script,'utf8')));
- console.log('PASS renamed skills and voice cues, charge limits and no text, mic or OS speech dependencies.');
+ assert(!fetches.some(url=>url.includes('assets/akari/')),'no Akari voice files are ever requested');
+ assert(!html.includes('akari-voice.js')&&!html.includes('akari-cues.js')&&!html.includes('SE・ボイス'));
+ console.log('PASS renamed skills, command SE, charge limits and no voice files, text, mic or OS speech dependencies.');
  console.log('ALL TAP BATTLE TESTS PASSED');
 })().catch(e=>{console.error(e);process.exit(1)});

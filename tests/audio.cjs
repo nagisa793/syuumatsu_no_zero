@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const root=path.resolve(__dirname,'../dist'),listeners={},sessionListeners={},contexts=[],elements={};
+const root=path.resolve(__dirname,'../dist'),listeners={},sessionListeners={},contexts=[],elements={},fetches=[];
 let audioClock=10000,mobileActivationPolicy=false,activeGesture=false;class TestDate extends Date{static now(){return audioClock}}
 function element(id){return elements[id]??={id,textContent:'',value:'',style:{},classList:{add(){},remove(){},toggle(){}},setAttribute(){},getContext:()=>({})}}
 function listen(type,fn){(listeners[type]??=[]).push(fn)}
@@ -11,7 +11,7 @@ class AudioContext{
  resume(){this.resumes++;if(mobileActivationPolicy&&!activeGesture)return Promise.reject(Error('activation required'));if(this.holdResume)return new Promise(()=>{});if(this.platformBlocksPlayback)return Promise.resolve();if(this.deferResume)return new Promise(resolve=>queueMicrotask(()=>{this.state='running';this.onstate?.();resolve()}));this.state='running';queueMicrotask(()=>this.onstate?.());return Promise.resolve()}
  createGain(){return{context:this,gain:{value:1,setValueAtTime(v){this.value=v},linearRampToValueAtTime(v){this.value=v}},connect(){},disconnect(){}}}
  createBuffer(ch,n){return{getChannelData:()=>new Float32Array(n)}}
- source(kind){const s={context:this,kind,frequency:{setValueAtTime(){}},connect(){},disconnect(){},start(t,offset,duration){this.started=true;this.at=t;this.offset=offset||0;this.duration=duration},stop(){this.stopped=true}};this.sources.push(s);return s}
+ source(kind){const s={context:this,kind,notes:[],connect(){},disconnect(){},start(t,offset,duration){this.started=true;this.at=t;this.offset=offset||0;this.duration=duration},stop(t){if(t===undefined||t<=this.context.currentTime)this.stopped=true;else this.stopAt=t}};s.frequency={setValueAtTime(value,at){s.notes.push({value,at})}};this.sources.push(s);return s}
  createBufferSource(){return this.source('buffer')}
  createOscillator(){return this.source('oscillator')}
  decodeAudioData(){if(this.decodeFailures){this.decodeFailures--;return Promise.reject(Error('transient decoding failure'))}return Promise.resolve({duration:122.091})}
@@ -25,10 +25,10 @@ const session={_type:'auto',state:'inactive',dictationActive:false,refusesMix:fa
  }
 },addEventListener(type,fn){(sessionListeners[type]??=[]).push(fn)}};
 const document={hidden:false,getElementById:element,createElement:()=>element('buffer'),addEventListener:listen};
-const context={console,Image,Date:TestDate,Math,Set,Promise,queueMicrotask,setTimeout:fn=>queueMicrotask(fn),Uint8Array,Float32Array,localStorage:{getItem(){return null},setItem(){}},navigator:{audioSession:session,mediaDevices:{getUserMedia(){throw Error('No microphone capture')}}},document,window:{AudioContext,addEventListener:listen},fetch:async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)})};
+const context={console,Image,Date:TestDate,Math,Set,Promise,queueMicrotask,setTimeout:fn=>queueMicrotask(fn),Uint8Array,Float32Array,localStorage:{getItem(){return null},setItem(){}},navigator:{audioSession:session,mediaDevices:{getUserMedia(){throw Error('No microphone capture')}}},document,window:{AudioContext,addEventListener:listen},fetch:async url=>{fetches.push(url);return{ok:true,arrayBuffer:async()=>new ArrayBuffer(8)}}};
 vm.createContext(context);const run=s=>vm.runInContext(s,context);
 run('let scoreStarted=false;let musicVolumeProbe=0;');
-for(const f of ['files.js','game.js','music.js','akari-cues.js','akari-voice.js'])vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),context,{filename:f});
+for(const f of ['files.js','game.js','music.js','command-audio.js'])vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),context,{filename:f});
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
 (async()=>{
  assert.equal(contexts.length,0,'page load does not start playback');
@@ -61,7 +61,7 @@ const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
  assert(home.paused&&resumedHome.stopped);assert(!home.source);assert(run('battleMusic.paused'));
  assert.equal(contexts.length,1,'the home score and launch sound share the existing output');
  contexts[0].currentTime=0;
- console.log('PASS title music waits for a gesture, loops, pauses/resumes, follows the BGM slider and stops before the launch voice; dedicated launch SE uses the same output.');
+ console.log('PASS title music waits for a gesture, loops, pauses/resumes, follows the BGM slider and stops before the transfer SE; dedicated launch SE uses the same output.');
  run('state="battle";unlockAudio(true);startBattleScore()');await run('battleMusic.ready()');await flush();
  assert.equal(session.type,'playback');assert.equal(run('audio.state'),'running');assert(run('battleMusic.source.started&&battleMusic.source.loop'));
  const track=run('battleMusic'),source=track.source,volume=track.volume;
@@ -69,30 +69,25 @@ const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
  assert.equal(track.volume,volume);
  console.log('PASS start tap declares playback and starts both BGM and SE.');
 
- await run('prepareAkariVoice()');
- const spoken=[],cards=run('Object.values(files).flat()'),cues=run('akariCues');
+ const confirmations=[],cards=run('Object.values(files).flat()');
+ const fetchedBeforeCommands=fetches.length;
  for(const card of cards){
-  run('speakAkariTechnique(files.'+card.file+'['+(card.num-1)+'])');await flush();
-  const active=Array.from(run('akariVoiceSources'));assert.equal(active.length,1);
-  if(spoken.length)assert(spoken.at(-1).stopped,'a new name immediately interrupts the previous voice');
-  const voice=active[0];assert.equal(voice.offset,cues[card.id].offset);assert.equal(voice.duration,cues[card.id].duration);assert.equal(voice.at,contexts[0].currentTime,'never wait for the old cue to finish');spoken.push(voice);
+  assert(run('playTechniqueSound(files.'+card.file+'['+(card.num-1)+'])'));
+  const active=Array.from(run('commandSoundSources'));assert.equal(active.length,1);
+  if(confirmations.length)assert(confirmations.at(-1).stopped,'a new confirmation cancels the previous sound immediately');
+  const cue=active[0];assert.equal(cue.kind,'oscillator');assert.equal(cue.context,contexts[0]);assert.equal(cue.at,contexts[0].currentTime);assert(cue.notes.length>=3);confirmations.push(cue);
  }
- assert.equal(spoken.length,19);assert.equal(contexts.length,1,'Akari shares the BGM and SFX output');
- assert.equal(track.source,source);assert(!source.stopped);assert.equal(track.volume,volume);assert.equal(session.type,'playback');
- elements.sfxvolume.oninput({target:{value:'50'}});assert.equal(spoken.at(-1).akariGain.gain.value,.36);assert.equal(track.volume,volume);
- run('clearQueuedAkariVoice()');assert.equal(run('akariVoiceSources.size'),1);assert(!spoken.at(-1).stopped);assert(spoken.slice(0,-1).every(s=>s.stopped));assert(!source.stopped,'clearing pending decoding must retain the current voice and BGM');
- run('stopAkariVoice();sfxVolume=.8');assert(spoken.every(s=>s.stopped));assert(!source.stopped);
- const beforeRapid=contexts[0].sources.length;
- run('speakAkariTechnique(files.sword[0]);speakAkariTechnique(files.guns[0]);speakAkariTechnique(files.shield[0])');await flush();
- assert.equal(contexts[0].sources.length,beforeRapid+1,'only the latest request survives pending decoding');
- assert.equal(Array.from(run('akariVoiceSources'))[0].offset,cues['shield-1'].offset);run('stopAkariVoice()');
- assert.equal(track.source,source);assert(!source.stopped);assert.equal(track.volume,volume);
- console.log('PASS all nineteen Akari names, immediate replacement of an active voice, last-request wins during decoding, and uninterrupted BGM.');
-
- await run('prepareAkariOpeningVoice();speakAkariOpening()');await flush();
- const opening=Array.from(run('akariVoiceSources'))[0];assert.equal(opening.akariCueName,'エンコードゼロ！');assert.equal(opening.duration,run('akariOpeningCue.duration'));assert.equal(opening.offset,0);assert.equal(opening.context,contexts[0]);assert(!source.stopped);assert.equal(track.volume,volume);
- await run('speakAkariOpening(.4)');await flush();const continued=Array.from(run('akariVoiceSources'))[0];assert(opening.stopped);assert.equal(continued.offset,.4);assert.equal(continued.duration,run('akariOpeningCue.duration-.4'));assert(!source.stopped);assert.equal(track.volume,volume);run('stopAkariVoice()');
- console.log('PASS opening call and resumed offset share the existing audio output without changing BGM gain or score position.');
+ assert.equal(confirmations.length,19);assert.equal(fetches.length,fetchedBeforeCommands,'all command sounds work without downloading a voice file');
+ assert.equal(contexts.length,1);assert.equal(track.source,source);assert(!source.stopped);assert.equal(track.volume,volume);
+ elements.sfxvolume.oninput({target:{value:'50'}});assert.equal(confirmations.at(-1).commandGain.gain.value,.055*.5);assert.equal(track.volume,volume);
+ run('stopCommandSound();sfxVolume=.8');assert(confirmations.every(s=>s.stopped));assert(!source.stopped);
+ run('playTechniqueSound(files.sword[0]);playTechniqueSound(files.guns[0]);playTechniqueSound(files.shield[0])');
+ assert.equal(run('commandSoundSources.size'),1);assert.equal(track.source,source);assert(!source.stopped);assert.equal(track.volume,volume);
+ run('stopCommandSound()');
+ assert(run('playEncodeSound()'));const encode=Array.from(run('commandSoundSources'))[0];assert.equal(encode.kind,'oscillator');assert.equal(encode.context,contexts[0]);assert(!source.stopped);
+ run('playEncodeSound(.4)');const continued=Array.from(run('commandSoundSources'))[0];assert(encode.stopped);assert.equal(continued.commandOffset,.4);assert(Math.abs(continued.stopAt-(contexts[0].currentTime+run('ENCODE_SIGNAL_DURATION')-.4+.005))<1e-8);assert(!source.stopped);
+ run('stopCommandSound()');assert.equal(fetches.length,fetchedBeforeCommands);assert(!fetches.some(url=>url.includes('assets/akari/')));
+ console.log('PASS all nineteen commands and the encode signal use immediate SE, cancel old sounds, follow the SE slider and leave BGM gain/source unchanged; no voice downloads.');
 
  contexts[0].currentTime=10.25;contexts[0].state='interrupted';emit('pointerdown');await flush();
  assert.equal(run('audio.state'),'running');assert.equal(track.source,source);assert.equal(track.currentTime,10.25);assert.equal(track.volume,volume);
@@ -136,17 +131,17 @@ const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve()};
  assert.equal(contexts[0].resumes,pendingAttempts+2);assert.equal(run('audio.state'),'running');assert.equal(track.source,source);assert.equal(track.currentTime,10.25);
  console.log('PASS an unresolved resume cannot permanently silence an active battle; recovery keeps the score position.');
 
- run('speakAkariTechnique(files.gravity[2])');await flush();const beforeCloseVoices=Array.from(run('akariVoiceSources'));
+ run('playTechniqueSound(files.gravity[2])');const beforeCloseSounds=Array.from(run('commandSoundSources'));
  contexts[0].state='closed';emit('pointerdown');await flush();assert.equal(contexts.length,2);assert.equal(run('audio.state'),'running');assert(source.stopped);
  assert(track.source.started&&track.source.loop);assert.equal(track.source.context,contexts[1]);assert.equal(track.source.offset,10.25);assert.equal(track.gain.context,contexts[1]);
  run('sfx("ready")');assert(contexts[1].sources.some(s=>s.kind==='oscillator'&&s.started));
- run('speakAkariTechnique(files.guns[0])');await flush();const mutedVoice=Array.from(run('akariVoiceSources'))[0];
- assert.equal(mutedVoice.context,contexts[1]);assert.equal(mutedVoice.at,contexts[1].currentTime,'new output must not inherit the old voice clock');assert(beforeCloseVoices.every(s=>s.stopped));
- elements.sfxvolume.oninput({target:{value:'0'}});assert.equal(mutedVoice.akariGain.gain.value,0);
+ run('playTechniqueSound(files.guns[0])');const mutedSound=Array.from(run('commandSoundSources'))[0];
+ assert.equal(mutedSound.context,contexts[1]);assert.equal(mutedSound.at,contexts[1].currentTime,'new output must not inherit the old sound clock');assert(beforeCloseSounds.every(s=>s.stopped));
+ elements.sfxvolume.oninput({target:{value:'0'}});assert.equal(mutedSound.commandGain.gain.value,0);
  run('sfx("shot")');assert.equal(run('voices[0].gain.gain.value'),0,'SE slider at zero silences new effects');
  elements.bgmvolume.oninput({target:{value:'0'}});assert.equal(track.volume,0);assert.equal(track.gain.gain.value,0);assert(!track.paused,'zero volume need not restart the score');
  emit('pointerdown');assert.equal(track.gain.gain.value,0,'audio recovery respects slider mute');
- elements.sfxvolume.oninput({target:{value:'80'}});elements.bgmvolume.oninput({target:{value:'55'}});assert.equal(track.volume,volume);assert.equal(mutedVoice.akariGain.gain.value,.576);
+ elements.sfxvolume.oninput({target:{value:'80'}});elements.bgmvolume.oninput({target:{value:'55'}});assert.equal(track.volume,volume);assert.equal(mutedSound.commandGain.gain.value,.055*.8);
  run('state="paused";syncBattleMusic()');emit('pointerdown');assert(track.paused,'recovering output does not start music while the game is paused');
  console.log('PASS closed audio recovery, preserved score position, slider-only mute, restored volumes and pause.');
 

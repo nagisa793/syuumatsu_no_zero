@@ -13,32 +13,29 @@ const homeReducedMotion=!!window.matchMedia?.('(prefers-reduced-motion: reduce)'
 
 function homeIntroActive(){return !!homeIntro&&(state==='intro'||state==='paused'&&beforePause==='intro')}
 function homeIntroTiming(){
- const voice=typeof akariOpeningCue==='undefined'?1.568:akariOpeningCue.duration;
- return {voice,departure:voice+.18,reveal:voice+.95,arrival:voice+3.00,debug:voice+3.55,end:voice+4.20};
+ const signal=ENCODE_SIGNAL_DURATION;
+ return {signal,departure:signal+.18,reveal:signal+.95,arrival:signal+3.00,debug:signal+3.55,end:signal+4.20};
 }
 function beginBattleIntro(){homeIntro=null;introAge=0;introCommands=[];introDebug=false;scoreStarted=false;state='intro';primeBattleScore();msg('');commandFeedback('接続中')}
 function beginHomeIntro(){
  stopHomeMusic();
  introAge=0;introCommands=[];introDebug=false;scoreStarted=false;state='intro';
- const scene=homeIntro={ready:false,voiceWait:0,audioWait:0,departed:false,arrived:false,startedAt:time};stopVoices();playHomeStartSound(()=>homeIntro===scene&&state==='intro'&&introAge<.3);playHomeIntroVoice();
+ const scene=homeIntro={audioWait:0,departed:false,arrived:false,startedAt:time};stopVoices();playHomeStartSound(()=>homeIntro===scene&&state==='intro'&&introAge<.3);playHomeIntroSound();
 }
-function playHomeIntroVoice(){
+function playHomeIntroSound(){
  const scene=homeIntro;if(!scene)return;
- scene.ready=false;scene.voiceWait=0;
- const accept=()=>homeIntro===scene&&state==='intro'&&introAge<homeIntroTiming().voice;
- speakAkariOpening(Math.min(introAge,homeIntroTiming().voice),accept).then(()=>{if(homeIntro===scene)scene.ready=true});
+ const accept=()=>homeIntro===scene&&state==='intro'&&introAge<homeIntroTiming().signal;
+ playEncodeSound(Math.min(introAge,homeIntroTiming().signal),accept);
 }
-function resumeHomeIntroVoice(){if(homeIntroActive()&&state==='intro'&&introAge<homeIntroTiming().voice)playHomeIntroVoice()}
+function resumeHomeIntroSound(){if(homeIntroActive()&&state==='intro'&&introAge<homeIntroTiming().signal)playHomeIntroSound()}
 function runIntroCommands(){for(const command of introCommands.splice(0))runCommand(command.text??command,command.options||{})}
 function tickBattleIntro(dt){
  if(homeIntro){
-  // Do not let wall-clock animation consume a call scheduled on a suspended
+  // Do not let wall-clock animation consume a signal scheduled on a suspended
   // output. A bounded wait still allows play when audio is unavailable.
   if(sound&&audio&&audio.state!=='running'){
    homeIntro.audioWait+=dt;unlockAudio();if(homeIntro.audioWait<1.5)return;
   }
-  // A failed audio download must never trap the player on the title screen.
-  if(!homeIntro.ready){homeIntro.voiceWait+=dt;if(homeIntro.voiceWait<.6)return;homeIntro.ready=true}
   introAge+=dt;const t=homeIntroTiming();
   if(introAge>=t.departure&&!homeIntro.departed){homeIntro.departed=true;sfx('boot')}
   if(introAge>=t.reveal&&!scoreStarted){scoreStarted=true;startBattleScore()}

@@ -115,10 +115,10 @@ hit=function(b,d){
  }
 };
 function errorScore(){
- const track=ensureBattleMusic();track.pause();track.source=null;track.buffer=null;track.decoding=null;track.bytes=fetch('assets/music/zero-error-horror.mp3').then(r=>{if(!r.ok)throw Error('ERROR score');return r.arrayBuffer()});track.offset=0;musicFailed=false;musicPlaying=false;musicPlayPending=false;
+ const track=ensureBattleMusic();track.pause();track.source=null;track.buffer=null;track.decoding=null;track.url='assets/music/zero-error-horror-v89.mp3';track.bytes=track.loadBytes();track.offset=0;musicFailed=false;musicPlaying=false;musicPlayPending=false;
 }
 function normalScore(){
- const track=ensureBattleMusic();track.pause();track.source=null;track.buffer=null;track.decoding=null;track.bytes=track.loadBytes();track.offset=0;musicFailed=false;musicPlaying=false;musicPlayPending=false;
+ const track=ensureBattleMusic();track.pause();track.source=null;track.buffer=null;track.decoding=null;track.url='assets/music/zero-debug-battle-v89.mp3';track.bytes=track.loadBytes();track.offset=0;musicFailed=false;musicPlaying=false;musicPlayPending=false;
 }
 function startErrorEncounter(){
  if(state!=='win'||encounter!=='boss')return false;

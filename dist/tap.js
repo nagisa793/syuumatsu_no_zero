@@ -16,7 +16,7 @@ function tapTechnique(id){
  if(autoTechniqueMode){autoTechniqueMode=false;if(activeOrder?.automaticMode)cancelOrders('アカリの指示へ切り替え')}
  // Target confirmation closes selection even when the player chose zero skills.
  const ok=submitOrder(c,{count:1,target:null,tapSelectionCycle});
- if(ok){msg(c.name+'を登録。');speakAkariTechnique(c);updateHud()}
+ if(ok){msg(c.name+'を登録。');playTechniqueSound(c);updateHud()}
  return ok;
 }
 function tapUseStock(){
@@ -25,13 +25,13 @@ function tapUseStock(){
  if(waiting){
   finishOrder('待機中の技をスキップ');
   if(lastOrderSpec?.orderId===waiting.id)discardInstructionContext();
-  autoTechniqueMode=false;stopAkariVoice();
+  autoTechniqueMode=false;stopCommandSound();
  }
  const next=waiting?orderQueue.find(o=>!o.intent&&!o.automaticMode):orderQueue.find(o=>o.awaitConfirm);
  if(!next){if(!waiting)return false;msg(waiting.card.name+'の待機をキャンセル。');updateHud();return true}
  if(next.awaitConfirm){if(!releaseNextOrder())return false}
  else{msg(next.card.name+'！');updateHud()}
- speakAkariTechnique(next.card);updateHud();return true;
+ playTechniqueSound(next.card);updateHud();return true;
 }
 function cancelableTechniqueSelection(){
  const candidates=[...orderQueue];
@@ -50,7 +50,7 @@ function tapCancel(){
   lastOrderSpec=previous?{card:previous.card,target:previous.target,orderId:previous.id}:null;
   lastCommandCard=previous?.card||null;receipt=previous?{card:previous.card,until:commandClock+2.4}:null;
  }
- clearQueuedAkariVoice();sfx('move');msg(selected.card.name+'の選択を戻したよ。');updateHud();return true;
+ stopCommandSound();sfx('move');msg(selected.card.name+'の選択を戻したよ。');updateHud();return true;
 }
 function tapTarget(number){
  unlockAudio(true);if(!runtimeReady||state!=='target')return false;
@@ -126,10 +126,10 @@ $('autotap').onclick=()=>{
  updateHud();
 };
 const tapHud=updateHud;updateHud=function(){tapHud();updateTapControls()};
-const tapReset=reset;reset=function(...args){stopAkariVoice();targetChoiceKey='';tapSelectionCycle++;const result=tapReset(...args);prepareAkariVoice();return result};
-const tapBeginTarget=beginTarget;beginTarget=function(){const previous=state,ok=tapBeginTarget();if(ok&&previous!=='target'){tapSelectionCycle++;clearQueuedAkariVoice()}updateTapControls();return ok};
-const tapCheckEnd=checkEnd;checkEnd=function(){const previous=state;tapCheckEnd();if(previous==='battle'&&['win','lose'].includes(state))clearQueuedAkariVoice()};
-const tapPause=pause;pause=function(){const result=tapPause();if(state==='paused')stopAkariVoice();return result};
+const tapReset=reset;reset=function(...args){stopCommandSound();targetChoiceKey='';tapSelectionCycle++;const result=tapReset(...args);return result};
+const tapBeginTarget=beginTarget;beginTarget=function(){const previous=state,ok=tapBeginTarget();if(ok&&previous!=='target'){tapSelectionCycle++;stopCommandSound()}updateTapControls();return ok};
+const tapCheckEnd=checkEnd;checkEnd=function(){const previous=state;tapCheckEnd();if(previous==='battle'&&['win','lose'].includes(state))stopCommandSound()};
+const tapPause=pause;pause=function(){const result=tapPause();if(state==='paused')stopCommandSound();return result};
 
 function stockInstructions(){return [activeOrder,...orderQueue].filter(o=>o&&!o.intent&&!o.automaticMode)}
 function drawStockSymbol(c,x,y){
@@ -152,7 +152,7 @@ function drawInstructionStock(){
  if(items.length>5)stockText('+'+(items.length-5),174,26,'#eafcf5',9);g.restore();
 }
 window.zeroBattle={...window.zeroBattle,reset,tapTechnique,tapUseStock,tapCancel,tapTarget,selectTargetAt,tapLand,
- readAudio:()=>({context:audio?.state||'not-started',session:globalThis.navigator?.audioSession?.state||'unsupported',type:globalThis.navigator?.audioSession?.type||'unsupported',resumePending:!!audioResumePending,musicPaused:battleMusic?.paused??true,volume:battleMusic?.volume??null,akariVoices:akariVoiceSources.size}),
+ readAudio:()=>({context:audio?.state||'not-started',session:globalThis.navigator?.audioSession?.state||'unsupported',type:globalThis.navigator?.audioSession?.type||'unsupported',resumePending:!!audioResumePending,musicPaused:battleMusic?.paused??true,volume:battleMusic?.volume??null,commandSounds:commandSoundSources.size}),
  readCommand:()=>({target:targetId,pinned:targetPinned,targetChangeRemaining,targetInstructionCount,landingRequested,
   order:activeOrder?{card:activeOrder.card.id,remaining:activeOrder.remaining,used:activeOrder.used,phase:activeOrder.phase,wait:activeOrder.wait}:null,
   queue:orderQueue.map(o=>({card:o.card.id,awaitConfirm:!!o.awaitConfirm,remaining:o.remaining})),history:orderHistory})};

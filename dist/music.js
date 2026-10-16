@@ -24,7 +24,7 @@ const MUSIC_MIX=.176; // 40% of the previous BGM gain; SFX remain unchanged.
 // Share the SFX AudioContext. No HTML media-element play/pause transitions
 // during recognition, and no reliance on iOS HTMLMediaElement.volume.
 class BattleScore {
- constructor(url='assets/music/zero-debug-battle-v17.mp3'){
+ constructor(url='assets/music/zero-debug-battle-v89.mp3'){
   this.url=url;
   this.paused=true;this.loop=true;this.plays=0;this.source=null;this.gain=null;this.buffer=null;this.offset=0;this.startedAt=0;this.generation=0;this._volume=musicVolume*MUSIC_MIX;this._muted=false;this.decoding=null;
   this.bytes=this.loadBytes();
@@ -68,7 +68,6 @@ function syncHomeMusic(){
  if(audio?.state==='running'&&(homeAudioWarmContext!==audio||Date.now()>=homeAudioWarmAt)){
   homeAudioWarmContext=audio;homeAudioWarmAt=Date.now()+1500;
   prepareHomeStartSound();
-  if(typeof prepareAkariOpeningVoice==='function')prepareAkariOpeningVoice();
  }
  // Boot requests playback once; a browser that blocks autoplay keeps this
  // output suspended until a permitted interaction unlocks it.

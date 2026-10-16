@@ -1,0 +1,57 @@
+{
+  "revision": 89,
+  "method": "fixed offline attenuation; no runtime gain changes",
+  "reference": {
+    "file": "zero-home-opening-v2.mp3",
+    "integrated_lufs": -14.2,
+    "range_lu": 1.8,
+    "true_peak_dbfs": -2.2,
+    "max_short_lufs": -13.6,
+    "max_momentary_lufs": -12.1,
+    "climax_10_to_20s_lufs": -14.2
+  },
+  "before": [
+    {
+      "file": "zero-debug-battle-v17.mp3",
+      "integrated_lufs": -7.6,
+      "range_lu": 1.0,
+      "true_peak_dbfs": 0.9,
+      "max_short_lufs": -6.1,
+      "max_momentary_lufs": -4.3,
+      "climax_10_to_20s_lufs": -6.1
+    },
+    {
+      "file": "zero-error-horror.mp3",
+      "integrated_lufs": -11.5,
+      "range_lu": 1.0,
+      "true_peak_dbfs": 0.0,
+      "max_short_lufs": -10.6,
+      "max_momentary_lufs": -9.3,
+      "climax_10_to_20s_lufs": -10.7
+    }
+  ],
+  "after": [
+    {
+      "file": "zero-debug-battle-v89.mp3",
+      "integrated_lufs": -15.4,
+      "range_lu": 1.0,
+      "true_peak_dbfs": -5.8,
+      "max_short_lufs": -13.9,
+      "max_momentary_lufs": -12.1,
+      "climax_10_to_20s_lufs": -13.9
+    },
+    {
+      "file": "zero-error-horror-v89.mp3",
+      "integrated_lufs": -15.1,
+      "range_lu": 1.0,
+      "true_peak_dbfs": -3.5,
+      "max_short_lufs": -14.2,
+      "max_momentary_lufs": -12.9,
+      "climax_10_to_20s_lufs": -14.3
+    }
+  ],
+  "gain_db": {
+    "zero-debug-battle-v89.mp3": -7.8,
+    "zero-error-horror-v89.mp3": -3.3
+  }
+}

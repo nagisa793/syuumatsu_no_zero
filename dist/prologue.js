@@ -64,7 +64,7 @@ function updateOpeningGate(){
 function beginPrologue(event){
  event?.stopPropagation?.();
  if(!runtimeReady||state!=='start'||opening.phase!=='touch')return false;
- unlockAudio(true);stopHomeMusic();stopVoices();stopAkariVoice();
+ unlockAudio(true);stopHomeMusic();stopVoices();stopCommandSound();
  Object.assign(opening,{phase:'film',age:0,wait:0,started:false});
  // Play this tiny sound immediately in the activation event. The pre-rendered
  // music/effects and title score decode while the first star is visible.
@@ -77,7 +77,7 @@ function finishPrologue(event){
  if(opening.phase!=='film')return false;
  const titleAlreadyPlaying=!openingBlocksHome();
  unlockAudio(true);opening.phase='home';opening.age=prologueTiming.end;
- stopPrologueAudio();stopAkariVoice();stopVoices();
+ stopPrologueAudio();stopCommandSound();stopVoices();
  updateOpeningGate();
  // Cancel pending film decodes before starting the already warmed title loop.
  const title=ensureHomeMusic();if(!titleAlreadyPlaying)title.currentTime=0;homeMusicRetryAt=0;

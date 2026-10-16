@@ -59,7 +59,7 @@ function unlockAudio(fromGesture=false){
   configureAudioOutput();
   if(!audio||audio.state==='closed'){
    const previous=audio;
-   if(previous)for(const track of audioScoreTracks()){track.offset=track.currentTime;track.stopSource();track.gain=null}
+   if(previous){if(typeof stopCommandSound==='function')stopCommandSound();for(const track of audioScoreTracks()){track.offset=track.currentTime;track.stopSource();track.gain=null}}
    audio=new (window.AudioContext||window.webkitAudioContext)();audioResumePending=null;lastAudioResumeAt=-Infinity;
    const context=audio;
    context.addEventListener?.('statechange',()=>{
@@ -163,7 +163,7 @@ function setGameMenu(panel){
 function openGameMenu(panel){
  if(state!=='paused'){
   menuFocusReturn=document.activeElement;beforePause=state;state='paused';
-  stopVoices();if(typeof stopAkariVoice==='function')stopAkariVoice();
+  stopVoices();if(typeof stopCommandSound==='function')stopCommandSound();
   holding=false;pendingMove=pendingShot=null;keys.clear();
  }
  setGameMenu(panel);
@@ -176,7 +176,7 @@ function resumeBattle(){
  if(typeof musicFailed!=='undefined'&&musicFailed){musicFailed=false;musicFailures=0}
  if(typeof syncBattleMusic==='function')syncBattleMusic();
  updateHud();menuFocusReturn?.focus?.();menuFocusReturn=null;
- if(typeof resumeHomeIntroVoice==='function')resumeHomeIntroVoice();
+ if(typeof resumeHomeIntroSound==='function')resumeHomeIntroSound();
  if(state==='start'&&typeof startWhenReady==='function')startWhenReady();
 }
 function pause(){
@@ -215,7 +215,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();if
 window.addEventListener('blur',()=>{keys.clear();holding=false});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&['battle','target','lock','intro'].includes(state))pause()});
 $('sfxvolume').value=sfxVolume*100;$('bgmvolume').value=musicVolume*100;
-$('sfxvolume').oninput=e=>{sfxVolume=Number(e.target.value)/100;saveAudio();if(typeof syncAkariVoiceVolume==='function')syncAkariVoiceVolume()};
+$('sfxvolume').oninput=e=>{sfxVolume=Number(e.target.value)/100;saveAudio();if(typeof syncCommandSoundVolume==='function')syncCommandSoundVolume()};
 $('bgmvolume').oninput=e=>{musicVolume=Number(e.target.value)/100;saveAudio();if(typeof syncBattleMusic==='function')syncBattleMusic()};
 $('reload').onclick=()=>location.reload();
 function readState(){return{state,hp,row,col,layer:layer?'air':'ground',energy,battery:energy,flight,flightPermanent,shield,trapped:groundTrapped(),nextAttackPower,panels:panelOwners.map((owner,i)=>({col:i%6,row:Math.floor(i/6),owner,holeSeconds:panelHoles.get(i)||0,captureSeconds:capturedPanels.get(i)??null})),equipped:{file:equipped.file,num:equipped.num},enemies:bugs.map(b=>({number:b.id,type:b.type,canFly:bugCanFly(b),hp:b.hp,row:b.r,col:b.c,layer:b.layer?'air':'ground'}))}}
