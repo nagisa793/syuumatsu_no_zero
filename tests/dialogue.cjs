@@ -92,15 +92,39 @@ function captureOpening(name){
  assert(els.touchbegin.onclick(filmEvents));assert.equal(filmEvents.stopped,1);assert.equal(run('opening.phase'),'film');assert.equal(run('state'),'start');
  assert(!els.touchbegin.onclick(filmEvents),'the first tap cannot start two films or accidentally skip');run('audio.decodeFailures=1');
  await run('preparePrologueAudio()');await run('homeMusic.ready()');for(let i=0;i<12;i++)await Promise.resolve();
- for(const [at,name] of [[.4,'STAR FRACTURE'],[1.7,'WHITE CRUMBLES'],[3.4,'CITY INFESTATION'],[6.4,'DATA COLLAPSE'],[7.6,'AKARI'],[8.85,'No.003! LONG SWORD'],[10.45,'ZERO WINDUP'],[10.75,'WHITE SLASH'],[11.2,'BUG DELETION'],[12.3,'WHITEOUT']]){
+ for(const [at,name] of [[.4,'STAR FRACTURE'],[1.7,'WHITE CRUMBLES'],[3.4,'CITY INFESTATION'],[6.4,'DATA COLLAPSE'],[7.6,'AKARI FRONT VIEW'],[8.85,'No.003! LONG SWORD'],[10.45,'ZERO WINDUP'],[10.75,'WHITE SLASH'],[11.2,'BUG DELETION'],[11.6,'ZERO HAS EXITED'],[12.3,'FADE TO WHITE'],[13.3,'WHITE HOLD'],[14.4,'HOME DISSOLVE']]){
   run('advance('+(at-run('opening.age'))+')');captureFilm(name);
-  assert.equal(run('opening.phase'),'film');assert(run('homeMusic.paused'),'the title loop must not leak into the film');
+  assert.equal(run('opening.phase'),'film');
+  if(at<run('prologueTiming.home'))assert(run('homeMusic.paused'),'the title loop must not leak into the film');
+  else assert(run('homeMusic.source.started&&!homeMusic.paused'),'the home theme begins with the white-to-home dissolve');
+  assert.equal(run('akariVoiceSources.size'),0,'the film must not play the Long Sword voice');
  }
+ const fadingHomeSource=run('homeMusic.source');
  assert.equal(seed,initialSeed,'film effects must never consume the battle RNG');assert.equal(run('hp'),200);assert.equal(run('energy'),100);assert.equal(run('elapsed'),0);
- assert(run('prologueScore.source&&!prologueScore.source.loop'));assert(run('prologueEffects.source&&!prologueEffects.source.loop'));
+ assert(run('!prologueScore.loop&&!prologueEffects.loop&&prologueScore.paused&&prologueEffects.paused'));
  for(const cel of run('prologueZero')){const data=cel.getContext('2d').getImageData(0,0,cel.width,cel.height).data;let solid=0;for(let i=0;i<data.length;i+=4)if(data[i+3]>0){solid++;assert.equal(data[i]+data[i+1]+data[i+2],0,'Zero, wings and sword must be pure black')}assert(solid>1000)}
  run('advance(1)');for(let i=0;i<12;i++)await Promise.resolve();assert.equal(run('opening.phase'),'home');assert(run('prologueScore.paused&&prologueEffects.paused'));assert(run('homeMusic.source.started&&!homeMusic.paused'));
- for(const at of [0,.3,2,4,7.6,8.9,10.7,12.3]){
+ assert.equal(run('homeMusic.source'),fadingHomeSource,'completing the dissolve must not restart the home theme');
+ // Ground paths remain separate for the full film, across walk/hold frames
+ // and offscreen wraps. Sizes use depth rather than random overlapping y.
+ const cast=run('prologueSwarm');assert(cast.some(b=>b.type==='grenade'&&b.flying));assert(cast.some(b=>b.type==='wasp'&&b.flying));assert(cast.some(b=>b.type==='dragonfly'&&b.flying));
+ assert(Math.max(...cast.map(b=>b.size))>=Math.min(...cast.map(b=>b.size))*5);
+ for(let at=0;at<=16;at+=.1){
+  const ground=run('prologueSwarmPlacements('+at+')').filter(b=>!b.flying);
+  for(let i=0;i<ground.length;i++)for(let j=i+1;j<ground.length;j++){
+   const a=ground[i],b=ground[j],overlapX=Math.abs(a.x-b.x)<(a.w+b.w)/2,overlapY=a.y<b.bottom&&b.y<a.bottom;
+   assert(!(overlapX&&overlapY),'ground bugs must never ride on or intersect one another at '+at);
+  }
+ }
+ const filmProbe=adapt(createCanvas(480,270)),filmPaint=filmProbe.getContext('2d'),filmDraw=filmPaint.drawImage.bind(filmPaint),zeroCels=run('prologueZero');let heroDraws=0;
+ filmPaint.drawImage=(im,...args)=>{if(zeroCels.includes(im))heroDraws++;return filmDraw(im,...args)};
+ run('drawPrologue')(filmPaint,10.75);assert(heroDraws>0,'the slash must show the complete winged silhouette');
+ for(const at of [11.4,11.6,12.3,13.3,14.4]){heroDraws=0;run('drawPrologue')(filmPaint,at);assert.equal(heroDraws,0,'the complete Zero and wings must leave after the slash')}
+ run('drawPrologue')(filmPaint,13.3);assert([...filmPaint.getImageData(0,0,480,270).data].every(v=>v===255),'the transition holds a clean white frame');
+ const expectedHome=adapt(createCanvas(480,270)),homePaint=expectedHome.getContext('2d');run('drawHomeBackdrop')(homePaint,run('homeSkyClock()'));
+ run('drawPrologue')(filmPaint,run('prologueTiming.end')-1/60);const lastDissolve=filmPaint.getImageData(0,0,480,270).data,firstHome=homePaint.getImageData(0,0,480,270).data;
+ let seamDifference=0;for(let i=0;i<lastDissolve.length;i++)seamDifference+=Math.abs(lastDissolve[i]-firstHome[i]);assert(seamDifference/lastDissolve.length<1,'the final dissolve must match the home screen without a cut');
+ for(const at of [0,.3,2,4,7.6,8.9,10.7,12.3,13.4,14.4]){
   run('opening.phase="touch";state="start";updateOpeningGate();stopHomeMusic()');assert(els.touchbegin.onclick(filmEvents));run('advance('+at+')');
   assert(els.skipopening.onclick(filmEvents));for(let i=0;i<12;i++)await Promise.resolve();
   assert.equal(run('opening.phase'),'home');assert.equal(run('state'),'start');assert(run('prologueScore.paused&&prologueEffects.paused'));
@@ -113,7 +137,7 @@ function captureOpening(name){
  run('opening.phase="touch";state="start";updateOpeningGate();stopHomeMusic();prologueScore.buffer=null;prologueScore.decoding=null;prologueScore.bytes=new Promise(resolve=>globalThis.releaseFilmBytes=resolve);prologueAudioWarm=null;prologueAudioReady=false');
  els.touchbegin.onclick(filmEvents);assert(els.skipopening.onclick(filmEvents));run('releaseFilmBytes(new ArrayBuffer(8))');await run('preparePrologueAudio()');for(let i=0;i<12;i++)await Promise.resolve();
  assert.equal(run('opening.phase'),'home');assert(run('prologueScore.paused&&!prologueScore.source&&prologueEffects.paused&&!prologueEffects.source'),'a delayed film decode cannot play after skipping');assert(run('homeMusic.source.started'));
- console.log('PASS TOUCH activation, all film cuts, pure black Zero, frozen battle/RNG, phase-by-phase and pending-decode skip, no ghost START, immediate home loop and presentation pause/resume.');
+ console.log('PASS TOUCH, separate ground paths and perspective, flying midboss, silent front-view Akari, pure black Zero with no lingering wings, smooth white/home dissolve, frozen battle/RNG and immediate skip in every phase.');
  const homeSource=fs.readFileSync(root+'intro.js','utf8'),homeHTML=fs.readFileSync(root+'index.html','utf8');
  const phone=run('homePhoneBounds()');assert.equal(phone.height,158);assert.equal(phone.angle,Math.PI/6);
  const halfW=(phone.width*Math.cos(phone.angle)+phone.height*Math.sin(phone.angle))/2,halfH=(phone.width*Math.sin(phone.angle)+phone.height*Math.cos(phone.angle))/2;
@@ -129,13 +153,15 @@ function captureOpening(name){
  run('advance(.6)');assert.equal(run('zeroArrivalProgress()'),0);captureOpening('ENCODE');
  els.begin.onclick();assert.equal(run('introAge'),.6,'a duplicated start tap cannot reset or skip the launch');
  run('advance('+(timing.departure+.18-.6)+')');assert(run('homeIntro.departed'));assert.equal(run('zeroArrivalProgress()'),0);captureOpening('TRANSFER');
- run('advance('+(timing.reveal+.35-run('introAge'))+')');assert(run('zeroArrivalProgress()>0&&zeroArrivalProgress()<1'));assert.equal(run('state'),'intro');captureOpening('MATERIALIZE');
+ run('advance('+(timing.reveal+.23-run('introAge'))+')');assert(run('zeroArrivalProgress()>0&&zeroArrivalProgress()<1'));assert.equal(run('state'),'intro');captureOpening('PANEL RECEIVER');
+ run('advance('+(timing.reveal+.85-run('introAge'))+')');captureOpening('DATA ASSEMBLY');
+ run('advance('+(timing.reveal+1.55-run('introAge'))+')');captureOpening('COLOR RESOLVE');
  run('advance('+(timing.arrival+.03-run('introAge'))+')');assert.equal(run('zeroArrivalProgress()'),1);assert.equal(run('state'),'intro');captureOpening('ARRIVAL');
  assert.equal(run('col'),1);assert.equal(run('row'),1);assert.equal(run('layer'),0);assert.equal(run('hp'),200);assert.equal(run('elapsed'),0);assert.equal(run('JSON.stringify(bugs.map(b=>[b.c,b.r,b.hp]))'),initialEnemies);
  run('advance('+(timing.debug+.18-run('introAge'))+')');assert(run('introDebug'));captureOpening('DEBUG');
  run('advance('+(timing.end+.1-run('introAge'))+')');assert.equal(run('state'),'target');assert.equal(run('homeIntro'),null);captureOpening('TARGET');
  if(process.env.ZERO_RENDER_OUT){
-  fs.mkdirSync(process.env.ZERO_RENDER_OUT,{recursive:true});const sheet=createCanvas(960*2,574*3),out=sheet.getContext('2d');out.fillStyle='#06111d';out.fillRect(0,0,sheet.width,sheet.height);out.font='bold 20px monospace';
+  fs.mkdirSync(process.env.ZERO_RENDER_OUT,{recursive:true});const sheet=createCanvas(960*2,574*Math.ceil(openingFrames.length/2)),out=sheet.getContext('2d');out.fillStyle='#06111d';out.fillRect(0,0,sheet.width,sheet.height);out.font='bold 20px monospace';
   for(const [i,f] of openingFrames.entries()){const x=i%2*960,y=Math.floor(i/2)*574;out.fillStyle='#baffeb';out.fillText(f.name,x+16,y+25);out.drawImage(f.image,x,y+34)}
   fs.writeFileSync(path.join(process.env.ZERO_RENDER_OUT,'opening-contact-sheet.png'),sheet.toBuffer('image/png'));
  }
@@ -151,22 +177,25 @@ function captureOpening(name){
 
  fresh();run('beginBattleIntro();beginHomeIntro()');await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();run('advance(.4)');
  const voiceBeforePause=Array.from(run('akariVoiceSources'))[0],introBeforePause=run('introAge');els.settings.onclick();assert(voiceBeforePause.stopped);run('advance(2)');assert.equal(run('introAge'),introBeforePause);
- els.settingsresume.onclick();for(let i=0;i<10;i++)await Promise.resolve();const resumedOpening=Array.from(run('akariVoiceSources'))[0];assert.equal(resumedOpening.akariCueName,'エンコードゼロ！');assert(Math.abs(resumedOpening.offset-introBeforePause)<1e-8);run('advance(5)');assert.equal(run('state'),'target');
- fresh();run('beginBattleIntro();beginHomeIntro();homeIntro.ready=false;advance(5)');assert.equal(run('state'),'target','an unresolved voice decode must never hold the opening forever');for(let i=0;i<10;i++)await Promise.resolve();assert.equal(run('akariVoiceSources.size'),0,'a late voice must not play over TARGET');
+ els.settingsresume.onclick();for(let i=0;i<10;i++)await Promise.resolve();const resumedOpening=Array.from(run('akariVoiceSources'))[0];assert.equal(resumedOpening.akariCueName,'エンコードゼロ！');assert(Math.abs(resumedOpening.offset-introBeforePause)<1e-8);run('advance(7)');assert.equal(run('state'),'target');
+ fresh();run('beginBattleIntro();beginHomeIntro();homeIntro.ready=false;advance(7)');assert.equal(run('state'),'target','an unresolved voice decode must never hold the opening forever');for(let i=0;i<10;i++)await Promise.resolve();assert.equal(run('akariVoiceSources.size'),0,'a late voice must not play over TARGET');
  console.log('PASS spoken launch, ordered teleport/reveal/DEBUG/TARGET, frozen actors, duplicate-tap protection, pause/resume voice offset and delayed-audio fallback.');
 
  fresh();run('beginHomeIntro()');await run('prepareAkariOpeningVoice()');for(let i=0;i<10;i++)await Promise.resolve();
  run('audio.blockedResume=true;audio.state="suspended";advance(.8)');assert.equal(run('introAge'),0,'the launch animation must not consume a voice scheduled on suspended audio');
- run('audio.blockedResume=false;audio.state="running";advance(.3)');assert(Math.abs(run('introAge')-.3)<1e-8);run('advance(5)');assert.equal(run('state'),'target');
- fresh();run('beginHomeIntro();audio.blockedResume=true;audio.state="suspended";advance(6)');assert.equal(run('state'),'target','an unavailable output must not trap the player forever');run('audio.blockedResume=false;audio.state="running"');
+ run('audio.blockedResume=false;audio.state="running";advance(.3)');assert(Math.abs(run('introAge')-.3)<1e-8);run('advance(7)');assert.equal(run('state'),'target');
+ fresh();run('beginHomeIntro();audio.blockedResume=true;audio.state="suspended";advance(8)');assert.equal(run('state'),'target','an unavailable output must not trap the player forever');run('audio.blockedResume=false;audio.state="running"');
  console.log('PASS delayed output activation preserves the opening voice/animation clock, with a bounded fallback when output stays unavailable.');
 
  // In-world targeting prioritizes the bug and its number. HP appears only in
  // the external target buttons, including during the selected lock flash.
  fresh();run('bugs[0].hp=37.2;bugs[1].hp=20;beginTarget();updateHud()');
  const paint=run('g'),originalFill=paint.fillRect.bind(paint),originalText=paint.fillText.bind(paint),paintLog=[];
- paint.fillRect=function(...a){paintLog.push({kind:'fill',blend:paint.globalCompositeOperation});return originalFill(...a)};
+ paint.fillRect=function(...a){paintLog.push({kind:'fill',blend:paint.globalCompositeOperation,rect:a});return originalFill(...a)};
  paint.fillText=function(text,...a){paintLog.push({kind:'text',text,font:paint.font});return originalText(text,...a)};
+ run('drawTargetTitle()');assert(paintLog.length>50);
+ assert(paintLog.every(e=>e.rect[0]>=0&&e.rect[0]+e.rect[2]<=240),'the entire TARGET title must stay in the left half');
+ assert(paintLog.every(e=>e.rect[1]>55),'TARGET must leave the upper-left stock icons clear');paintLog.length=0;
  run('drawCommandOverlay()');
  const dimmer=paintLog.findIndex(e=>e.kind==='fill'&&e.blend==='multiply');assert(dimmer>=0);
  for(const label of ['No.001','No.002'])assert(paintLog.findIndex(e=>e.text===label)>dimmer,label+' must remain readable above TARGET dimming');

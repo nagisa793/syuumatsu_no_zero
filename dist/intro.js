@@ -14,13 +14,13 @@ const homeReducedMotion=!!window.matchMedia?.('(prefers-reduced-motion: reduce)'
 function homeIntroActive(){return !!homeIntro&&(state==='intro'||state==='paused'&&beforePause==='intro')}
 function homeIntroTiming(){
  const voice=typeof akariOpeningCue==='undefined'?1.568:akariOpeningCue.duration;
- return {voice,departure:voice+.10,reveal:voice+.62,arrival:voice+1.58,debug:voice+1.70,end:voice+2.32};
+ return {voice,departure:voice+.18,reveal:voice+.95,arrival:voice+3.00,debug:voice+3.55,end:voice+4.20};
 }
 function beginBattleIntro(){homeIntro=null;introAge=0;introCommands=[];introDebug=false;scoreStarted=false;state='intro';primeBattleScore();msg('');commandFeedback('接続中')}
 function beginHomeIntro(){
  stopHomeMusic();
  introAge=0;introCommands=[];introDebug=false;scoreStarted=false;state='intro';
- const scene=homeIntro={ready:false,voiceWait:0,audioWait:0,departed:false,startedAt:time};stopVoices();playHomeStartSound(()=>homeIntro===scene&&state==='intro'&&introAge<.3);playHomeIntroVoice();
+ const scene=homeIntro={ready:false,voiceWait:0,audioWait:0,departed:false,arrived:false,startedAt:time};stopVoices();playHomeStartSound(()=>homeIntro===scene&&state==='intro'&&introAge<.3);playHomeIntroVoice();
 }
 function playHomeIntroVoice(){
  const scene=homeIntro;if(!scene)return;
@@ -42,6 +42,7 @@ function tickBattleIntro(dt){
   introAge+=dt;const t=homeIntroTiming();
   if(introAge>=t.departure&&!homeIntro.departed){homeIntro.departed=true;sfx('boot')}
   if(introAge>=t.reveal&&!scoreStarted){scoreStarted=true;startBattleScore()}
+  if(introAge>=t.arrival&&!homeIntro.arrived){homeIntro.arrived=true;sfx('ready')}
   if(introAge>=t.debug&&!introDebug){introDebug=true;sfx('debug')}
   if(introAge>=t.end){homeIntro=null;beginTarget();runIntroCommands()}
   return;
@@ -51,17 +52,42 @@ function tickBattleIntro(dt){
 function zeroArrivalProgress(){if(!homeIntroActive())return 1;const t=homeIntroTiming();return Math.max(0,Math.min(1,(introAge-t.reveal)/(t.arrival-t.reveal)))}
 function drawZeroTransfer(){
  const q=zeroArrivalProgress();if(q<=0)return;
- const p=zeroVisualPosition(),feet=p.y+12,cel=zeroAnimationFrame(),ease=1-(1-q)**3;
- const beam=Math.sin(q*Math.PI)*.66;g.save();
- const glow=g.createLinearGradient(p.x-27,0,p.x+27,0);glow.addColorStop(0,'#81ffe600');glow.addColorStop(.5,`rgba(133,255,231,${beam})`);glow.addColorStop(1,'#81ffe600');g.fillStyle=glow;g.fillRect(p.x-27,0,54,feet+10);
- ring(p.x,feet,22+8*Math.sin(q*Math.PI),'#b5ffeb',Math.min(1,q*4)*(1-q*.55));
- g.strokeStyle=`rgba(188,255,235,${(1-q)*.8})`;g.lineWidth=1;g.beginPath();g.ellipse(p.x,feet,30,8,0,0,Math.PI*2);g.stroke();
- // Materialize the complete existing sprite without changing its proportions.
- const scan=feet-ZERO_SIZE+ZERO_SIZE*ease;
- g.save();g.beginPath();g.rect(p.x-80,feet-ZERO_SIZE-5,160,ZERO_SIZE*ease+5);g.clip();
- drawCel(cel.sheet,cel.frame,p.x,feet,ZERO_SIZE,Math.min(1,q*3),false,q<.32);g.restore();
- if(q<.92){g.fillStyle='#e7fff3';g.fillRect(Math.round(p.x-22),Math.round(scan),44,2);g.fillStyle='#8bffe785';g.fillRect(Math.round(p.x-27),Math.round(scan-2),54,1)}
- for(let n=0;n<16;n++){const a=(n*37+introAge*150)%240/240,x=p.x+Math.sin(n*8.7)*27*(1-q*.6),y=feet-a*(ZERO_SIZE+45);g.globalAlpha=(1-q)*(.3+n%3*.2);g.fillStyle=n%3?'#8bfde2':'#f3ffe5';g.fillRect(Math.round(x),Math.round(y),n%4?1:2,2+n%3)}
+ const p=zeroVisualPosition(),feet=p.y+12,cel=zeroAnimationFrame();
+ if(q>=1){drawCel(cel.sheet,cel.frame,p.x,feet,ZERO_SIZE);return}
+ const settle=Math.max(0,Math.min(1,(q-.76)/.24)),presence=Math.min(1,q/.16)*(1-settle);
+ const build=Math.max(0,Math.min(1,(q-.18)/.54)),ease=build*build*(3-2*build);
+ g.save();
+ // The receiver wakes first, then locks four corners of the initial panel.
+ for(const [rx,ry,delay] of [[31,9,0],[24,6,.06]]){
+  g.globalAlpha=Math.max(0,Math.min(1,(q-delay)/.12))*(1-settle)*.75;g.strokeStyle='#a6ffdf';g.lineWidth=1;
+  g.beginPath();g.ellipse(p.x,feet,rx,ry,0,0,Math.PI*2);g.stroke();
+ }
+ g.globalAlpha=presence;g.strokeStyle='#ceffef';
+ for(const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+  const x=p.x+sx*29,y=feet+sy*9;g.beginPath();g.moveTo(x-sx*7,y);g.lineTo(x,y);g.lineTo(x,y-sy*3);g.stroke();
+ }
+ const beam=presence*Math.min(1,Math.max(0,(q-.08)/.15))*.48;
+ const glow=g.createLinearGradient(p.x-26,0,p.x+26,0);glow.addColorStop(0,'#81ffe600');glow.addColorStop(.5,`rgba(133,255,231,${beam})`);glow.addColorStop(1,'#81ffe600');
+ g.globalAlpha=1;g.fillStyle=glow;g.fillRect(p.x-26,0,52,feet+6);
+ // Feet, legs, torso and head assemble in order, followed by a color resolve.
+ const scan=feet-(ZERO_SIZE+4)*ease;
+ if(build>0){
+  g.save();g.beginPath();g.rect(p.x-80,scan,160,feet-scan+3);g.clip();
+  drawCel(cel.sheet,cel.frame,p.x,feet,ZERO_SIZE,Math.min(1,build*5),false,build<.94);g.restore();
+  if(build>=.94&&settle<1){g.save();g.globalAlpha=(1-settle)*.32;drawCel(cel.sheet,cel.frame,p.x,feet,ZERO_SIZE,(1-settle)*.32,false,true);g.restore()}
+ }
+ if(build>0&&build<1){
+  g.fillStyle='#edfff5';g.fillRect(Math.round(p.x-22),Math.round(scan),44,2);
+  g.fillStyle='#8bffe785';g.fillRect(Math.round(p.x-27),Math.round(scan-2),54,1);
+ }
+ // Individual data packets stream inwards, instead of popping in the sprite.
+ for(let n=0;n<24;n++){
+  const cycle=(q*2.6+n*.381966)%1,side=n%2?1:-1;
+  const x=p.x+side*(1-cycle)*(31+n%5*3),y=feet-8-n%8*9-(1-cycle)*24;
+  g.globalAlpha=presence*Math.sin(cycle*Math.PI)*.75;g.fillStyle=n%3?'#8bfde2':'#f3ffe5';
+  g.fillRect(Math.round(x),Math.round(y),n%4?1:2,n%3?3:5);
+ }
+ if(settle>0){g.globalAlpha=1;ring(p.x,feet,24+settle*19,'#dcfff2',(1-settle)*.8)}
  g.restore();
 }
 function homeSkyClock(){return homeReducedMotion?0:homeIntroActive()?homeIntro.startedAt+introAge:time}

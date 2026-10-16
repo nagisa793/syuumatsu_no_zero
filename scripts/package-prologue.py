@@ -12,21 +12,20 @@ OUT = ROOT / 'dist/assets/prologue'
 OUT.mkdir(parents=True, exist_ok=True)
 generated = ROOT.parent / 'generated_images'
 assets = {
-    'city': ('exec-f0889c62-7d00-4d12-be01-362034c81124.png', (960, 540)),
-    'akari': ('exec-b75eacf2-625d-4f3a-9dd2-7279e5949814.png', (960, 540)),
+    'city': ('exec-f0889c62-7d00-4d12-be01-362034c81124.png', 'v86', (960, 540)),
+    'akari': ('exec-216ec33d-5027-424c-b079-4b0cb2a9fcbb.png', 'v88', (960, 540)),
 }
-for key, (name, size) in assets.items():
-    version = 'v86'
+for key, (name, version, size) in assets.items():
     original = SOURCE / f'prologue-{key}-{version}.png'
     if (generated / name).exists():
         shutil.copyfile(generated / name, original)
     image = Image.open(original)
     image = image.resize(size, Image.Resampling.NEAREST)
-    image.save(OUT / f'{key}-v86.webp', lossless=True, method=6)
-for name,source,size in [('zero-original','zero-sword-long-v4',(768,512)),
-                         ('wing-original','wings-3-v1',(1024,352))]:
+    image.save(OUT / f'{key}-{version}.webp', lossless=True, method=6)
+for name,source,version,size in [('zero-original','zero-sword-long-v4','v88',(768,512)),
+                                ('wing-original','wings-3-v1','v87',(1024,352))]:
     image=Image.open(ROOT/f'dist/assets/animation/{source}.png')
-    image.resize(size,Image.Resampling.NEAREST).save(OUT/f'{name}-v87.png',optimize=True)
+    image.resize(size,Image.Resampling.NEAREST).save(OUT/f'{name}-{version}.png',optimize=True)
 for name, source in [('wasp','bug-wasp-v2'), ('dragonfly','bug-dragonfly-v2'),
                      ('spider','bug-spider-v3'), ('centipede','bug-centipede-v3')]:
     image = Image.open(ROOT / f'dist/assets/animation/{source}.png')

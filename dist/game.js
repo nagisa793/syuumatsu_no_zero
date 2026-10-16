@@ -177,7 +177,6 @@ function resumeBattle(){
  if(typeof syncBattleMusic==='function')syncBattleMusic();
  updateHud();menuFocusReturn?.focus?.();menuFocusReturn=null;
  if(typeof resumeHomeIntroVoice==='function')resumeHomeIntroVoice();
- if(typeof resumePrologueVoice==='function')resumePrologueVoice();
  if(state==='start'&&typeof startWhenReady==='function')startWhenReady();
 }
 function pause(){

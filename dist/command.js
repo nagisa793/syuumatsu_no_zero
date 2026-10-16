@@ -72,7 +72,7 @@ function targetBadgeBounds(b){
 function drawTargetTitle(){
  const glyphs={T:['11111','00100','00100','00100','00100','00100','00100'],A:['01110','11011','11011','11111','11011','11011','11011'],R:['11110','11011','11011','11110','11100','11010','11011'],G:['01111','11000','11000','11011','11011','11011','01110'],E:['11111','11000','11000','11110','11000','11000','11111']};
  g.save();g.fillStyle=state==='lock'?'#b5ffe2':'#f4ffff';
- for(const [n,letter] of [...'TARGET'].entries())for(let y=0;y<7;y++)for(let x=0;x<5;x++)if(glyphs[letter][y][x]==='1')g.fillRect(310+n*24+x*4+Math.floor((6-y)*.6),11+y*4,4,4);
+ for(const [n,letter] of [...'TARGET'].entries())for(let y=0;y<7;y++)for(let x=0;x<5;x++)if(glyphs[letter][y][x]==='1')g.fillRect(64+n*24+x*4+Math.floor((6-y)*.6),80+y*4,4,4);
  g.restore();
 }
 function drawCommandOverlay(){

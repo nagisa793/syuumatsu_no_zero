@@ -1,4 +1,4 @@
-"""Render the 12.8-second cyber-disaster film: music and independent SFX stems.
+"""Render the 15.1-second cyber-disaster film: music and independent SFX stems.
 
 No synthesis or model download is required on the player's device.
 """
@@ -10,7 +10,7 @@ from scipy.signal import butter, sosfilt
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'dist/assets/music'
 SR=32000
-DURATION=12.8
+DURATION=15.1
 N=round(SR*DURATION)
 rng=np.random.default_rng(861015)
 score=np.zeros((N,2),np.float64)
@@ -56,7 +56,7 @@ for i in range(16):
   add(score,at,noise(.1,2000,36),.08)
 for at in [3,4.46,5.92]:
  for note in [52,55,59,63]:add(score,at,tone(note,1.23),.045)
-# The voice close-up and black command card use a deliberate drop in density.
+# The silent mouth close-up and black command card use a drop in density.
 add(score,7.2,tone(40,1.1,'sub'),.11)
 for i,note in enumerate([64,67,71]):add(score,8.4+i*.14,tone(note,.3,'metal'),.07)
 add(score,9.1,tone(47,1.48,'sub'),.14)
@@ -64,7 +64,7 @@ for i in range(12):
  at=9.45+i*.08
  add(score,at,tone(64+i,.09,'metal'),.035+i*.002,(-1)**i*.38)
 # The decisive bright electronic chord and fast arpeggio accompany one slash.
-for note in [40,52,59,64,67,71,76]:add(score,10.6,tone(note,1.45,'bright'),.12 if note<60 else .075)
+for note in [40,52,59,64,67,71,76]:add(score,10.6,tone(note,2.5,'bright'),.12 if note<60 else .075)
 for i,note in enumerate([76,79,83,88,83,79,76,71,76,79,83,88]):
  add(score,10.65+i*.09,tone(note,.18,'metal'),.09,(-1)**i*.35)
 
@@ -93,13 +93,18 @@ impact(10.6,.47)
 for i in range(22):
  at=10.67+i*.047
  add(effects,at,tone(91-(i%7)*3,.14,'metal'),.10,(-1)**i*.65)
-add(effects,12,noise(.7,7800,5),.12)
+# The cut resolves into a sustained, airy whiteout before the home theme.
+for note in [59,64,71]:add(score,11.8,tone(note,1.75,'synth'),.027)
+add(effects,11.45,noise(1.9,7800,2.6),.09)
 
 for kind,data,target_rms,peak in [('score',score,.16,.75),('effects',effects,.115,.83)]:
  data=np.tanh(data*1.4)
- data*=min(peak/max(.0001,np.max(np.abs(data))),target_rms/max(.0001,np.sqrt(np.mean(data**2))))
- data[-round(SR*.08):]*=np.linspace(1,0,round(SR*.08))[:,None]
- wav=OUT/f'zero-prologue-{kind}-v86.wav'
+ reference=data[:round(SR*12.8)]
+ data*=min(peak/max(.0001,np.max(np.abs(data))),target_rms/max(.0001,np.sqrt(np.mean(reference**2))))
+ fade_start,fade_end=round(SR*12.8),round(SR*13.7)
+ data[fade_start:fade_end]*=np.linspace(1,0,fade_end-fade_start)[:,None]
+ data[fade_end:]=0
+ wav=OUT/f'zero-prologue-{kind}-v88.wav'
  with wave.open(str(wav),'wb') as f:
   f.setnchannels(2);f.setsampwidth(2);f.setframerate(SR)
   f.writeframes(np.asarray(np.clip(data,-.9,.9)*32767,'<i2').tobytes())
@@ -107,4 +112,4 @@ for kind,data,target_rms,peak in [('score',score,.16,.75),('effects',effects,.11
  subprocess.run(['ffmpeg','-y','-v','error','-i',str(wav),'-codec:a','libmp3lame','-b:a','128k',str(mp3)],check=True)
  wav.unlink()
  print(kind,mp3.stat().st_size,'rms',round(float(np.sqrt(np.mean(data**2))),4),'peak',round(float(np.max(np.abs(data))),4))
-(OUT/'zero-prologue-v86.json').write_text(json.dumps({'duration':DURATION,'music':'dark electronic disaster to decisive Em9 slash','stems':['score','effects'],'voice':'existing Akari long-sword cue','cues':{'star':0,'crumble':1.15,'city':2.8,'akari':7.2,'command':8.4,'sword':10.1,'hit':10.6,'white':12,'home':12.8}},indent=2)+'\n')
+(OUT/'zero-prologue-v88.json').write_text(json.dumps({'duration':DURATION,'music':'dark electronic disaster to decisive Em9 slash and sustained whiteout','stems':['score','effects'],'voice':None,'cues':{'star':0,'crumble':1.15,'city':2.8,'akari':7.2,'command':8.4,'sword':10.1,'hit':10.6,'zero_exit':11.35,'fade_to_white':11.45,'white':13.15,'home_music_and_dissolve':13.7,'home':15.1}},indent=2)+'\n')

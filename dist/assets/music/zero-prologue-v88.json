@@ -1,0 +1,23 @@
+{
+  "duration": 15.1,
+  "music": "dark electronic disaster to decisive Em9 slash and sustained whiteout",
+  "stems": [
+    "score",
+    "effects"
+  ],
+  "voice": null,
+  "cues": {
+    "star": 0,
+    "crumble": 1.15,
+    "city": 2.8,
+    "akari": 7.2,
+    "command": 8.4,
+    "sword": 10.1,
+    "hit": 10.6,
+    "zero_exit": 11.35,
+    "fade_to_white": 11.45,
+    "white": 13.15,
+    "home_music_and_dissolve": 13.7,
+    "home": 15.1
+  }
+}
